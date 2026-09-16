@@ -24,7 +24,7 @@ recommendation with reasons over a menu of options.
 ## Getting oriented
 
 ```bash
-.venv/bin/python -m pytest -q          # 299 tests, ~8s
+.venv/bin/python -m pytest -q          # 315 tests, ~8s
 .venv/bin/python -m shatter.cli --help # or `shatter` (editable install)
 ```
 
@@ -66,37 +66,46 @@ on `main`. There is no remote.
 | 11 | Tile borders — `--border black\|white` | done |
 | 12 | Two-colour tiles by prototile shape — `--tile-split by_type` | done |
 | 13 | Sanzo Wada colour mode — `--mode wada`, three role layouts, contrast floor | done |
-| **14** | **Breeding the new colour genes — next** | planned |
+| 14 | Breeding the colour genes — mode-aware `colour` gene, decision 9 | done |
 
 ## What to do next
 
-**Phase 14** (design doc §12). Register `border`, `tile_split`, `wada_combination`,
-`role_layout` and `role_permutation` as breedable genes, all under the existing
-`colour` gene, and implement §12.1 decision 9 (guarantee every child differs from
-its parent). Two parts need care:
+**The phase roadmap is complete — phases 0 through 14 are built.** There is no
+"next phase"; what remains is in design doc **§13 (open items)** and **§14 (not
+building now)**, and none of it is committed work. The live ones worth knowing:
 
-- **`role_permutation` is not an ordinary gene.** Per decision 10 it draws
-  *independently* of the combination and at a *lower* rate, and moves by a single
-  transposition rather than a uniform re-roll. That is what lets someone keep a
-  role layout they like while the combinations keep roaming — the coarse
-  whole-gene lock cannot express it. **Set the rate by measurement, not by
-  taste**, the way decision 9 was settled.
-- **`contact.describe()` still reports only family, seed and three shatter
-  knobs.** Once the palette is what varies between two panels, a caption that
-  cannot tell them apart is worse than none.
+- **A third contrast tier** (§12.1 decision 16). Box-vs-background being close
+  is benign — it just gives the medallion-on-plain-ground look — while a close
+  tile-vs-box is fatal, but the strict floor treats them alike. Loosening the
+  first would admit roughly eight more `box` combinations. **Deliberately not
+  done:** the offered pool is ~2,800 assignments, nowhere near thin. Do it only
+  if the pool ever feels narrow.
+- **The floor constants** are confirmed at 25/12 but were only ever judged on
+  screen, never in print. If a proof comes back muddy, that is the first place
+  to look.
+- **Open items in §13** — box-aware vs radial shatter, a patch-rotation knob.
 
-This is the phase that makes phase 13 usable: §12 treats it as part of phase 13's
-definition of done, because the mode now opens hundreds of combinations and
-without breeding the only way to explore them is to type ids in by hand.
+Before starting anything here, read **§12.1** first. Sixteen decisions are
+recorded with their reasoning, several of which were *reversed* by measurement
+during phases 13–14; re-arguing them from scratch will waste your time.
 
 ## Gotchas that have already cost time
 
 - **`"white"` is also a paper type** (`--paper white`, `dimensions.py`). A careless
   sweep of the colour strings silently changes spine-width arithmetic.
 - **Adding a mutable gene breaks saved `--breed-seed` values.** The mutation stream
-  shifts and a recorded seed stops reproducing its row. This is why all the new
-  colour genes are batched into phase 14 — one break instead of four. A golden
-  stream test in `tests/test_breed.py` fails loudly when it happens.
+  shifts and a recorded seed stops reproducing its row. **This happened, once, at
+  phase 14**, with all four colour genes batched so it happened once rather than
+  four times; the stream goldens in `tests/test_breed.py` were re-recorded
+  deliberately and say so. Seeds from before phase 14 no longer reproduce.
+  Mode-gating saved the *wada* draws but not `border` and `tile_split`, which
+  apply in both modes — see §12.1 decision 14 if you are tempted to add another.
+
+- **A guard can pass and still be worthless.** The stream golden used to record
+  four children and six fields. A phase 14 prototype that shifted the stream for
+  22 of 30 children *passed it*, because divergence began at child 4 and `zoom`
+  happened to land the same. It now covers sixteen children and every field. When
+  a guard matters, check it actually fails on the thing it is guarding against.
 - **Overlaps are ~0.02% of covered pixels at default knobs.** Any test or golden
   meant to exercise overlap colouring needs jitter turned up, or it passes for the
   wrong reason. Several fixtures exist for this (`COLLIDING` in `test_render.py`).

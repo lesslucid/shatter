@@ -359,6 +359,50 @@ def offered(role_layout: str) -> tuple[tuple[int, int], ...]:
     )
 
 
+@lru_cache(maxsize=8)
+def offered_by_combination(role_layout: str) -> dict[int, tuple[int, ...]]:
+    """`offered()` regrouped as {combination id: floor-passing permutations}.
+
+    The breeder needs the grouping to keep a role assignment across a change of
+    combination: it has to ask "is the permutation I am already using legal for
+    this new combination?" without scanning the whole offered pool.
+    """
+    grouped: dict[int, list[int]] = {}
+    for combination, permutation in offered(role_layout):
+        grouped.setdefault(combination, []).append(permutation)
+    return {combination: tuple(perms) for combination, perms in grouped.items()}
+
+
+def neighbouring_permutations(
+    combination: WadaCombination, role_layout: str, role_permutation: int
+) -> tuple[int, ...]:
+    """Permutations one role-swap from this one, that still pass the floor.
+
+    This is the move decision 10 gives `role_permutation`: a single transposition
+    rather than a uniform re-roll across all k! orderings, so an excursion from
+    the house look is a recognisable variation -- the ground and the box trading
+    places -- instead of a scramble. Transpositions generate the full symmetric
+    group, so repeated `Further` still reaches every ordering; it just walks
+    there.
+
+    The floor filter is decision 15: a swap can drop the result below the
+    contrast floor, and the breeder must never emit an assignment the mode would
+    not have offered. An empty result means every neighbour fails, and the caller
+    should keep the permutation it has.
+    """
+    orderings = _orderings(len(roles_for_layout(role_layout)))
+    current = orderings[role_permutation % len(orderings)]
+
+    neighbours = []
+    for i, j in itertools.combinations(range(len(current)), 2):
+        swapped = list(current)
+        swapped[i], swapped[j] = swapped[j], swapped[i]
+        index = orderings.index(tuple(swapped))
+        if passes_contrast_floor(assign_roles(combination, role_layout, index)):
+            neighbours.append(index)
+    return tuple(neighbours)
+
+
 def effective_tile_split(mode: str, role_layout: str, tile_split: str) -> str:
     """The split the renderer should actually use.
 

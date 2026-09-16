@@ -18,13 +18,15 @@ separately, in every family. **Phase 13 (the Sanzo Wada colour mode) is built**:
 three role layouts, behind a two-tier perceptual contrast floor. **297 tests
 pass**, with a 27-image golden suite.
 
-**Phase 14 is planned and not yet built** — breeding the new colour genes. Note
-that section 12 treats it as part of phase 13's definition of done rather than as
-polish: the mode now opens hundreds of combinations, and until the breeder can
-reach them the only way to explore is to type combination numbers in by hand. See
-section 12 for the phases and **section 12.1 for the sixteen decisions they were
-agreed against**, which is the part to read first if you are picking this up
-cold.
+**Phase 14 (breeding the colour genes) is built**, which is what makes phase 13
+usable: `border`, `tile_split` and the Wada fields are all bred under the one
+`colour` gene, and every child now differs from its parent however much is
+locked. That last part is the condition decision 8 was granted on — you can lock
+everything but `colour`, press Further, and climb back out of a dark ground.
+
+**Phases 0–14 are complete.** See section 12 for the phases and **section 12.1 for
+the sixteen decisions they were agreed against**, which is the part to read first
+if you are picking this up cold.
 
 **Working name:** `shatter` — the package name and the CLI command. (The repo
 folder on disk is `shattered/`; only the *package* name matters to the code, so
@@ -1056,8 +1058,7 @@ a permuted one and the busiest path (split, border and overlap at once).
 120/120 `shapes` and 103/108 `full` combinations, and a dark background does reach the
 offered set, so decision 8 survives contact with decision 11.
 
-**Phase 14 — Breeding the new genes.** *(planned; difficulty: MEDIUM — the gene
-registry is easy, but see decisions 14-15 for what the audit found underneath it)*
+**Phase 14 — Breeding the new genes.** *(done)*
 Register `border`, `tile_split`, the Wada combination and `role_permutation` in phase 9's
 gene registry, all under the existing `colour` gene so that one lock still means one
 intuitive thing. `role_permutation` is the one needing care: per decision 10 it draws
@@ -1103,9 +1104,29 @@ then **1.77** once `seed` joins them and **0.88** with everything but `colour` h
 
 Also update `contact.describe()`, which currently reports only family, seed and three
 shatter knobs. Once the palette is what varies between two panels, a caption that cannot
-tell them apart is worse than no caption.
-*Check:* breeding in `wada` mode with `colour` locked never changes any colour role;
-unlocked, Further reaches a visibly different scheme within a couple of generations.
+tell them apart is worse than no caption. *(Done: it now carries a second line naming the
+combination, layout and permutation in wada mode, or the pastel and tile/box pair in
+classic, plus the border when there is one.)*
+
+*One correction the implementation forced,* recorded because it is the kind of thing that
+reads fine in a design and fails in use. Decision 15 says the *(combination, layout,
+permutation)* triple moves together, and a first cut drew all three from the offered pool
+at once — which quietly destroyed decision 10. At `palette_probability` 0.18 that
+re-randomised the role assignment roughly every fifth child, so an alternate track could
+never be held long enough to choose, which is the one thing decision 10 exists to
+provide. The permutation is therefore **carried across a change of combination** whenever
+it stays legal; only a change of *layout* resets it, because three roles becoming four
+makes the index mean something else. See `breed._carry_permutation`.
+
+*Check (passed):* breeding in `wada` mode with `colour` locked never changes any colour
+role; with everything *but* `colour` locked, every one of five children differs — measured
+**5.00 of 5 for all 62 partial lock combinations**, against the 0.88 this section
+predicted for the unfixed behaviour, and 0 exact copies in 20,000 unlocked children, so
+the fallback costs nothing when nothing is locked. Every bred `wada` child is an
+assignment the mode would have offered, checked over 1,500 children. The role assignment
+moves by a single transposition, more rarely than the combination, and survives a change
+of combination in over half the cases where the layout holds. `--mode wada --lock
+shatter,spacing,seed,tiling,zoom` produces ten visibly different palettes in one sheet.
 
 
 ### 12.1 DECISIONS BEHIND PHASES 9–14
@@ -1310,7 +1331,12 @@ Agreed before implementation, recorded so they can be revisited rather than re-a
       three-colour combination and `full` needs a four-colour one, so the gene
       must move *(combination, layout, permutation)* as a consistent triple.
       Drawing it from `offered(layout)` does that and satisfies decision 11 for
-      free, since that set is already floor-filtered.
+      free, since that set is already floor-filtered. **Amended during
+      implementation:** drawing all three *at once* also re-randomises the
+      permutation with every new combination, which destroys decision 10's
+      stickiness — the assignment was being scrambled roughly every fifth child.
+      The permutation is carried across instead whenever it stays legal, and only
+      a change of layout resets it. Phase 14 records the measurement.
     - **A transposition can fail the floor.** Decision 10 moves the permutation
       by swapping two roles, and the result may sit below the contrast floor.
       Retry a different transposition, and keep the current permutation if none

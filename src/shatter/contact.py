@@ -22,7 +22,7 @@ class SheetStyle:
     thumb_height: int = 390
     columns: int = 5
     padding: int = 10
-    caption: int = 30
+    caption: int = 46  # index line, then describe()'s two lines
     supersample: int = 3
 
 
@@ -33,10 +33,34 @@ def thumbnail(spec: CoverSpec, style: SheetStyle) -> Image.Image:
     return render_front(spec.build_layout(), params)
 
 
+def describe_colour(spec: CoverSpec) -> str:
+    """The palette half of a caption, in whichever model the spec is in."""
+    if spec.mode == "wada":
+        text = (
+            f"wada{spec.wada_combination} {spec.role_layout} "
+            f"perm{spec.role_permutation}"
+        )
+    else:
+        text = f"{spec.bg} {spec.tile_color}-on-{spec.box_color}"
+        if spec.tile_split == "by_type":
+            text += f"/{spec.tile_color_b}"
+    if spec.border != "none":
+        text += f" {spec.border}-border"
+    return text
+
+
 def describe(spec: CoverSpec) -> str:
+    """Two lines: what the shatter is doing, then what the colour is doing.
+
+    The colour line is phase 14. Before it, breeding could only move the palette
+    between nine classic combinations and the caption never needed to mention it;
+    now `wada` mode varies the palette as the main event, and a caption that
+    cannot tell two panels apart is worse than no caption at all.
+    """
     return (
         f"{spec.family} seed{spec.seed} core{spec.core_fraction:.2f} "
-        f"push{spec.max_push:.2f} jit{spec.jitter:.2f}"
+        f"push{spec.max_push:.2f} jit{spec.jitter:.2f}\n"
+        f"{describe_colour(spec)}"
     )
 
 
@@ -66,7 +90,11 @@ def contact_sheet(
         y = style.padding + (index // columns) * cell_h
         sheet.paste(thumbnail(spec, style), (x, y))
         draw.text((x, y + style.thumb_height + 3), f"{index:02d}", font=font, fill=LABEL_RGB)
-        draw.text(
-            (x, y + style.thumb_height + 17), describe(spec), font=font, fill=DETAIL_RGB
+        draw.multiline_text(
+            (x, y + style.thumb_height + 17),
+            describe(spec),
+            font=font,
+            fill=DETAIL_RGB,
+            spacing=1,
         )
     return sheet

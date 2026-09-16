@@ -50,3 +50,32 @@ def test_panel_n_shows_spec_n():
 def test_description_names_what_varies():
     text = describe(CoverSpec(family="p2", seed=9))
     assert "p2" in text and "seed9" in text
+
+
+def test_the_description_tells_two_palettes_apart():
+    """Phase 14. Once breeding moves the palette, two panels that differ only in
+    colour must not share a caption -- that is worse than no caption at all."""
+    a = describe(CoverSpec(mode="wada", wada_combination=126))
+    b = describe(CoverSpec(mode="wada", wada_combination=243, role_layout="full"))
+    assert a != b
+    assert "wada126" in a and "wada243" in b
+
+
+def test_the_description_follows_the_colour_mode():
+    classic = describe(CoverSpec(bg="#F2D9E6", tile_color="dark"))
+    assert "#F2D9E6" in classic and "wada" not in classic
+
+    wada = describe(CoverSpec(mode="wada", role_layout="shapes", role_permutation=4))
+    assert "shapes" in wada and "perm4" in wada
+
+
+def test_the_description_mentions_a_border_only_when_there_is_one():
+    assert "border" not in describe(CoverSpec(border="none"))
+    assert "black-border" in describe(CoverSpec(border="black"))
+
+
+def test_a_split_names_its_second_colour():
+    """Otherwise two split covers differing only in the second fill caption
+    identically."""
+    text = describe(CoverSpec(tile_split="by_type", tile_color_b="white"))
+    assert "white" in text.splitlines()[1]

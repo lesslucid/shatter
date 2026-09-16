@@ -11,9 +11,19 @@ everything else keeps rolling.
 
 import random
 from collections.abc import Callable, Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from functools import lru_cache
 
+from shatter.color import (
+    BORDER_STYLES,
+    NAMED_COLORS,
+    ROLE_LAYOUTS,
+    TILE_SPLITS,
+    neighbouring_permutations,
+    offered_by_combination,
+)
 from shatter.spec import CoverSpec
+from shatter.wada import combination_by_id
 
 #: Sensible range for each mutable knob. Mutations are scaled to the span and
 #: clamped to the ends, so a knob sitting at its limit still produces legal
@@ -74,6 +84,41 @@ PALETTES = tuple(
 )
 
 
+#: Every (layout, combination, permutation) the wada mode may offer, as one flat
+#: pool. Flat because the three move together and cannot be drawn independently:
+#: `box` and `shapes` need a three-colour combination and `full` a four-colour
+#: one, so a layout and a combination have to agree on size (decision 15). Every
+#: entry has already passed the contrast floor, which is what makes "the breeder
+#: only offers covers that pass" true by construction rather than by checking.
+@lru_cache(maxsize=1)
+def wada_schemes() -> tuple[tuple[str, int], ...]:
+    return tuple(
+        (layout, combination)
+        for layout in ROLE_LAYOUTS
+        for combination in offered_by_combination(layout)
+    )
+
+
+def _carry_permutation(spec: CoverSpec, role_layout: str, combination: int) -> int:
+    """The role assignment to use after the combination moves under it.
+
+    Decision 10 wants a role assignment you like to *survive* while the colours
+    roam -- that is the whole point of giving the permutation its own low rate.
+    Drawing a fresh permutation with every new combination would undo it: at
+    `palette_probability` the assignment would be scrambled roughly every fifth
+    child, and no alternate layout could ever be held long enough to choose.
+
+    So the parent's permutation is carried across whenever it is still legal.
+    When the *layout* changes the index means something else entirely -- three
+    roles become four -- so there is nothing to carry, and the lowest legal
+    permutation is used instead, which lands back on the house look.
+    """
+    legal = offered_by_combination(role_layout)[combination]
+    if role_layout == spec.role_layout and spec.role_permutation in legal:
+        return spec.role_permutation
+    return min(legal)
+
+
 @dataclass(frozen=True)
 class Radius:
     """How far a child may drift from its parent.
@@ -92,6 +137,21 @@ class Radius:
     family_probability: float = 0.0
     palette_probability: float = 0.0
     zoom_probability: float = 0.0
+    #: How often the *role assignment* shifts, independently of the combination
+    #: and by a single swap (decision 10). Deliberately lower than
+    #: `palette_probability`: it is what makes the house look the statistical
+    #: centre rather than merely the starting point, and what lets an alternate
+    #: role layout survive long enough to be chosen. Only read in wada mode.
+    #:
+    #: 0.10 was measured, not chosen (decision 10 asks for that explicitly).
+    #: Across rows of five bred from the stock wada spec: 45% of rows offer at
+    #: least one alternate assignment -- so you meet one every second row or so --
+    #: while 4.44 of 5 children still carry the parent's, which is what keeps a
+    #: track you have chosen from drifting out from under you. 0.06 made an
+    #: alternate too rare to find (33% of rows, a median of 10 generations to
+    #: meet one); 0.20 put one in two rows out of three and stopped the current
+    #: assignment reading as the default.
+    permutation_probability: float = 0.0
 
 
 CLOSER = Radius(knob_scale=0.10, seed_probability=0.20)
@@ -101,6 +161,7 @@ FURTHER = Radius(
     family_probability=0.12,
     palette_probability=0.18,
     zoom_probability=0.12,
+    permutation_probability=0.10,
 )
 
 RADII = {"closer": CLOSER, "further": FURTHER}
@@ -143,12 +204,71 @@ def _mutate_tiling(spec: CoverSpec, radius: Radius, rng: random.Random) -> Chang
     return {}
 
 
-def _mutate_colour(spec: CoverSpec, radius: Radius, rng: random.Random) -> Changes:
+def _mutate_classic_colour(spec: CoverSpec, radius: Radius, rng: random.Random) -> Changes:
+    changes: Changes = {}
     if rng.random() < radius.palette_probability:
         current = (spec.bg, spec.tile_color, spec.box_color)
         bg, tile, box = _other(PALETTES, current, rng)
-        return {"bg": bg, "tile_color": tile, "box_color": box}
-    return {}
+        changes.update({"bg": bg, "tile_color": tile, "box_color": box})
+    if rng.random() < radius.palette_probability:
+        split = _other(TILE_SPLITS, spec.tile_split, rng)
+        changes["tile_split"] = split
+        if split == "by_type":
+            # The second fill only means anything once the tiles are split, and
+            # it must not match the box: the box is what shows through the gaps,
+            # so equal values would make that prototile disappear.
+            box = changes.get("box_color", spec.box_color)
+            options = tuple(name for name in NAMED_COLORS if name != box)
+            changes["tile_color_b"] = _other(options, spec.tile_color_b, rng)
+    return changes
+
+
+def _mutate_wada_colour(spec: CoverSpec, radius: Radius, rng: random.Random) -> Changes:
+    """The wada equivalent, and deliberately not the classic one with extra fields.
+
+    Decision 15: `bg`, `tile_color` and `box_color` are left alone here, because
+    wada mode never reads them -- drifting them would fill a saved config with
+    values that do nothing while every panel came back the same colour.
+    """
+    changes: Changes = {}
+    if rng.random() < radius.palette_probability:
+        current = (spec.role_layout, spec.wada_combination)
+        layout, combination = _other(wada_schemes(), current, rng)
+        changes.update({
+            "role_layout": layout,
+            "wada_combination": combination,
+            "role_permutation": _carry_permutation(spec, layout, combination),
+        })
+
+    # The role assignment draws separately and more rarely (decision 10), so a
+    # layout worth keeping survives a few generations of combinations roaming.
+    if rng.random() < radius.permutation_probability:
+        layout = changes.get("role_layout", spec.role_layout)
+        combination = changes.get("wada_combination", spec.wada_combination)
+        permutation = changes.get("role_permutation", spec.role_permutation)
+        neighbours = neighbouring_permutations(
+            combination_by_id(combination), layout, permutation
+        )
+        if neighbours:
+            changes["role_permutation"] = rng.choice(neighbours)
+    return changes
+
+
+def _mutate_colour(spec: CoverSpec, radius: Radius, rng: random.Random) -> Changes:
+    """The colour gene, which reads whichever model the spec is in (decision 15).
+
+    `border` is drawn for both, because a tile outline is independent of where
+    the colours came from -- which is also why `color.resolve_border` sits
+    outside the mode dispatch.
+    """
+    if spec.mode == "wada":
+        changes = _mutate_wada_colour(spec, radius, rng)
+    else:
+        changes = _mutate_classic_colour(spec, radius, rng)
+
+    if rng.random() < radius.palette_probability:
+        changes["border"] = _other(BORDER_STYLES, spec.border, rng)
+    return changes
 
 
 def _mutate_zoom(spec: CoverSpec, radius: Radius, rng: random.Random) -> Changes:
@@ -191,8 +311,14 @@ GENES: tuple[Gene, ...] = (
     Gene("seed", ("seed",), "the arrangement", _mutate_seed, "seed_probability"),
     Gene("tiling", ("family",), "the tiling family", _mutate_tiling, "family_probability"),
     Gene(
-        "colour", ("bg", "tile_color", "box_color"), "the colour scheme",
-        _mutate_colour, "palette_probability",
+        "colour",
+        (
+            "bg", "tile_color", "box_color", "tile_color_b", "tile_split",
+            "border", "wada_combination", "role_layout", "role_permutation",
+        ),
+        "the colour scheme",
+        _mutate_colour,
+        "palette_probability",
     ),
     Gene("zoom", ("zoom", "depth"), "tile density", _mutate_zoom, "zoom_probability"),
 )
@@ -266,7 +392,51 @@ def mutate(
         proposed = gene.mutate(spec, radius, rng)
         if gene.name not in locked:
             changes.update(proposed)
-    return spec.with_changes(**changes)
+    child = spec.with_changes(**changes)
+    if child == spec:
+        child = _force_a_difference(spec, radius, rng, locked)
+    return child
+
+
+def _force_a_difference(
+    spec: CoverSpec, radius: Radius, rng: random.Random, locked: frozenset[str]
+) -> CoverSpec:
+    """Decision 9: a child identical to its parent wastes one of five slots.
+
+    Section 11.2 already refuses a mutation that re-picks the current value, for
+    exactly this reason, and row 1 of the chooser already shows the parent -- so
+    row 2 has no need of a copy. Rather than scaling the mutation rates up when
+    genes are locked, draw as normal and repair the one case that matters.
+
+    **This never fires for unlocked breeding**, which is what keeps the unlocked
+    stream bit-identical: the eight continuous knobs drift on every child, so an
+    exact copy is only reachable once `shatter` and `spacing` are both held.
+    Measured at 0 exact copies in 20,000 unlocked children.
+
+    A gene is forced by re-running its own mutation with its gate opened to
+    certainty, so it uses the same rules it always does -- nothing here knows how
+    any particular gene moves. If every free gene refuses (all its alternatives
+    equal the current value), the parent comes back unchanged and the caller
+    treats it as the refusal it is; that is the `Closer`-is-exempt case, where
+    only major genes are free and the radius cannot move them.
+    """
+    free = [
+        gene
+        for gene in GENES
+        if gene.name not in locked and getattr(radius, gene.gate) > 0
+    ]
+    if not free:
+        return spec
+
+    # Random order, so the same gene is not always the one that gives way.
+    order = free[:]
+    rng.shuffle(order)
+    for gene in order:
+        forced = replace(radius, **{gene.gate: 1.0})
+        child = spec.with_changes(**gene.mutate(spec, forced, rng))
+        if child != spec:
+            return child
+    return spec
 
 
 def generation(
