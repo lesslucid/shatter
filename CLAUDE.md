@@ -24,7 +24,7 @@ recommendation with reasons over a menu of options.
 ## Getting oriented
 
 ```bash
-.venv/bin/python -m pytest -q          # 297 tests, ~8s
+.venv/bin/python -m pytest -q          # 299 tests, ~8s
 .venv/bin/python -m shatter.cli --help # or `shatter` (editable install)
 ```
 

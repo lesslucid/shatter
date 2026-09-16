@@ -1,3 +1,5 @@
+import hashlib
+import json
 import random
 
 import pytest
@@ -332,6 +334,66 @@ def test_the_mutation_stream_is_unchanged_by_phase_9():
         for c in children
     ]
     assert actual == GOLDEN_FURTHER_1234
+
+
+def _spec_digest(spec: CoverSpec) -> str:
+    """A short, stable fingerprint of every field on a spec."""
+    return hashlib.sha256(
+        json.dumps(spec.to_dict(), sort_keys=True).encode()
+    ).hexdigest()[:12]
+
+
+#: The same promise as `GOLDEN_FURTHER_1234`, but over **sixteen** children and
+#: **every** field rather than four children and six fields.
+#:
+#: Widened before phase 14, after the narrow version was measured letting a real
+#: break through: a prototype that shifted the stream for 22 of 30 children still
+#: passed, because the divergence began at child 4 -- one past the end of what was
+#: recorded -- and `zoom`, which draws after `colour`, happened to land on the same
+#: value anyway. A guard that only looks at the first four children cannot see a
+#: break that starts at the fifth, and both the chooser (rows of five) and
+#: `contact --count 10` routinely go further than that.
+#:
+#: Digests rather than values because sixteen specs of fifteen mutable fields is an
+#: unreadable wall; the index of the first mismatch is the diagnostic, and the
+#: table above says what the early children should actually contain.
+GOLDEN_FURTHER_1234_DIGESTS = [
+    "808ed8fdb878", "3a9af06ddecc", "6192d66bae82", "a3767c50541c",
+    "a70434a60287", "994888996ffc", "55fd4752a635", "70c2ce5a3ca3",
+    "415e78e51422", "162b6f9b5762", "0e62def64d8b", "4bfe2606ccb4",
+    "4926c95b6d4c", "b966b3a438b7", "010c6662ce68", "7c27501426d7",
+]
+
+#: Closer draws from the same stream -- a gated gene still calls `rng.random()`
+#: even when its probability is zero -- so it is a second, independent witness
+#: that the draw order has not moved.
+GOLDEN_CLOSER_1234_DIGESTS = [
+    "a92ac921b4b6", "74af0b1385c9", "0ee7ee535817", "de0c885ef9d4",
+    "01f3e71dc8d2", "5b40b554ab18", "1b6ad017d7ca", "342e010663c4",
+    "e86e418d5197", "d92daa04b804", "c45e0bc99ba7", "c64a1f4e3448",
+    "81e25d252581", "b42594e5f11a", "7dd89308d538", "d86f002499d9",
+]
+
+
+@pytest.mark.parametrize(
+    "radius, golden",
+    [(FURTHER, GOLDEN_FURTHER_1234_DIGESTS), (CLOSER, GOLDEN_CLOSER_1234_DIGESTS)],
+    ids=["further", "closer"],
+)
+def test_the_whole_mutation_stream_is_unchanged(radius, golden):
+    actual = [
+        _spec_digest(child)
+        for child in generation(CoverSpec(), len(golden), radius, random.Random(1234))
+    ]
+    first = next(
+        (i for i, (a, b) in enumerate(zip(actual, golden)) if a != b), None
+    )
+    assert first is None, (
+        f"the mutation stream diverges from child {first} onward, so a saved "
+        f"--breed-seed no longer reproduces its row. If this is a deliberate "
+        f"change (adding a gene or a draw shifts the stream -- see phase 14), "
+        f"re-record it on purpose and say so in the comment above."
+    )
 
 
 # --- which genes a radius can actually move --------------------------------

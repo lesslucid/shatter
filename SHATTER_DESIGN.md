@@ -161,6 +161,7 @@ shattered/                      (repo root)
       wada.py                   loads the vendored Wada dataset (phase 13)
       data/
         sanzo_wada_colors.json  VENDORED DATA (section 2's narrow exception)
+        SOURCE.md               its provenance and MIT licence; vendored with it
       breed.py                  mutation rules for the chooser (section 11.2)
       contact.py                thumbnails and labelled contact sheets
       chooser.py                the tkinter breeding window (phase 7b)
