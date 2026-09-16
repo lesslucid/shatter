@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "shatter"
+version = "0.1.0"
+description = "Shattered-tiling book cover generator"
+requires-python = ">=3.10"
+dependencies = ["Pillow>=10"]
+
+[project.scripts]
+shatter = "shatter.cli:main"
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+# The vendored Wada dataset (phase 13). `data/` is deliberately not a package --
+# the loader reaches it as `files("shatter") / "data"` -- so it needs listing here
+# or a wheel build silently ships without it.
+[tool.setuptools.package-data]
+shatter = ["data/*.json", "data/*.md"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
