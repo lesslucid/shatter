@@ -22,7 +22,7 @@ pass**, with a 27-image golden suite.
 that section 12 treats it as part of phase 13's definition of done rather than as
 polish: the mode now opens hundreds of combinations, and until the breeder can
 reach them the only way to explore is to type combination numbers in by hand. See
-section 12 for the phases and **section 12.1 for the thirteen decisions they were
+section 12 for the phases and **section 12.1 for the sixteen decisions they were
 agreed against**, which is the part to read first if you are picking this up
 cold.
 
@@ -1056,7 +1056,8 @@ a permuted one and the busiest path (split, border and overlap at once).
 120/120 `shapes` and 103/108 `full` combinations, and a dark background does reach the
 offered set, so decision 8 survives contact with decision 11.
 
-**Phase 14 — Breeding the new genes.** *(planned; difficulty: LOW, given phase 9)*
+**Phase 14 — Breeding the new genes.** *(planned; difficulty: MEDIUM — the gene
+registry is easy, but see decisions 14-15 for what the audit found underneath it)*
 Register `border`, `tile_split`, the Wada combination and `role_permutation` in phase 9's
 gene registry, all under the existing `colour` gene so that one lock still means one
 intuitive thing. `role_permutation` is the one needing care: per decision 10 it draws
@@ -1065,6 +1066,15 @@ transposition. **Set that rate here by measurement** — report how many of five
 keep the parent's permutation, and pick a rate that leaves the house look dominant within
 a row while still turning up an alternate within a few generations. Do not choose the
 constant by taste; decision 9 was settled the same way.
+
+*What the pre-implementation audit changed here.* Three things, all recorded as
+decisions 14-16. The `colour` gene becomes **mode-aware** rather than gaining fields
+(decision 15), and must move the Wada *(combination, layout, permutation)* triple
+together because a layout and a combination have to agree on size. The classic mutation
+stream **breaks once, deliberately** (decision 14) — mode-gating saves it from the Wada
+draws, but not from `border` and `tile_split`, which apply in both modes. And the
+contrast floor constants were confirmed rather than changed (decision 16), so
+`offered()` is a stable pool to breed against.
 
 Treat this as **part of phase 13's definition of done, not as optional polish.** Phase 13
 opens a space of hundreds of combinations times permutations times border styles; without
@@ -1263,6 +1273,71 @@ Agreed before implementation, recorded so they can be revisited rather than re-a
     conversion is about a dozen lines and adds no dependency. The shipped `lab` stays
     in the vendored data untouched, per section 2's rule that the data is copied
     verbatim; it is simply not what the floor reads.
+
+14. **The classic mutation stream is broken once, deliberately, at phase 14.**
+    *(decided from measurement, after phase 13.)* Prototyped three ways before
+    choosing:
+
+    | variant | classic stream |
+    |---|---|
+    | Wada draws gated on `spec.mode` | **bit-identical over 200 children** |
+    | `border` bred with its own draw | broken |
+    | `border` folded inside the existing branch | broken |
+
+    Mode-gating genuinely works, and it works because decision 5 fixes a spec's
+    mode for its whole breeding run, so a `classic` spec consumes exactly the
+    draw sequence it consumes today. But `border` and `tile_split` apply in
+    **both** modes, and any draw for them shifts the stream for every subsequent
+    child. Breeding two shipped features (phases 11 and 12) is worth more than
+    the saved `--breed-seed` values, so the break is accepted — once, with all
+    four genes landing together, which is why they were batched here.
+
+    **The stream golden was widened before this phase, not after** — the narrow
+    version could not see the break it existed to catch. See the comment on
+    `GOLDEN_FURTHER_1234_DIGESTS`. Re-recording it is part of *this* phase's work
+    and must be done knowingly, with the comment updated to say so.
+
+15. **The `colour` gene is mode-aware.** In `wada` mode it mutates the Wada
+    fields and leaves `bg`, `tile_color` and `box_color` untouched; in `classic`
+    mode it behaves exactly as it does today. Without this, breeding a `wada`
+    cover drifts three fields that `wada` mode never reads, so saved configs
+    accumulate values that do nothing — and the panels all come back the same
+    colour anyway, which is what the mode looks like today.
+
+    Two constraints the audit turned up, recorded because neither is obvious:
+
+    - **`role_layout` cannot mutate on its own.** `box` and `shapes` need a
+      three-colour combination and `full` needs a four-colour one, so the gene
+      must move *(combination, layout, permutation)* as a consistent triple.
+      Drawing it from `offered(layout)` does that and satisfies decision 11 for
+      free, since that set is already floor-filtered.
+    - **A transposition can fail the floor.** Decision 10 moves the permutation
+      by swapping two roles, and the result may sit below the contrast floor.
+      Retry a different transposition, and keep the current permutation if none
+      passes — never emit an assignment the mode would not have offered.
+
+16. **The contrast floor constants stand at 25 strict / 12 lenient.**
+    *(confirmed by eye and by measurement, at the end of phase 13.)*
+
+    The **lenient floor needs no tuning**: it sits in a dead zone. Any value in
+    (8.2, 14.6] gives byte-identical results for `full`, and anything at or below
+    14.8 does for `shapes`. It makes exactly one decision — rejecting
+    combination 337's pairings at dE 8.2 — and that rejection is right; the two
+    tile colours are indistinguishable on the page.
+
+    The **strict floor is a real trade** and 25 is the place to stand: 20 would
+    admit 8 more `box` combinations, 30 would cost 10. All 11 combinations that
+    25 rejects and 20 would admit were rendered and looked at. Only one (#131,
+    dE 18.4, orange tiles on an orange box) is actually broken; the rest are
+    merely soft, and always because **box-vs-background** is close.
+
+    That asymmetry is worth recording as a **known future refinement, not a
+    to-do**: box-vs-background being soft just produces the medallion-on-plain-
+    ground look that section 8 already treats as first-class, whereas a soft
+    tile-vs-box is fatal. A third tier would admit those. It is not worth
+    reopening decision 11 now — the offered set is roughly 2,800 assignments,
+    nowhere near thin — but if the pool ever feels narrow, this is the cheapest
+    place to widen it.
 
 **Suggested order:** 9 → 10 → (11 and 12, in either order) → 13 → 14. Phases 11 and 12 are
 independent of each other once 10 lands, so either can go first or they can be split.

@@ -10,7 +10,7 @@ debris. It renders **no text**; a collaborator sets the type afterwards.
 **[SHATTER_DESIGN.md](SHATTER_DESIGN.md) is the spec of record.** It is long but
 it is the source of truth, and it is kept current — every phase below was written
 up there as it landed. Read section 12 (build plan) and **section 12.1 (decisions
-already settled)** before proposing anything; thirteen decisions are recorded there
+already settled)** before proposing anything; sixteen decisions are recorded there
 with their reasoning specifically so they get revisited rather than re-argued.
 
 ## Working agreement with this user
