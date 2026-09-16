@@ -196,3 +196,65 @@ def test_toggling_a_lock_explains_it(chooser):
     chooser.lock_vars["shatter"].set(False)
     chooser.explain_lock(gene)
     assert "free" in chooser.status.cget("text")
+
+
+# --- the colour-model switch -------------------------------------------------
+
+
+def test_the_radio_starts_on_the_mode_it_was_launched_with(root, tmp_path):
+    window = Chooser(root, CoverSpec(zoom=60, mode="wada"), tmp_path, random.Random(1))
+    assert window.mode_var.get() == "wada"
+    assert all(spec.mode == "wada" for spec in window.rows[0])
+
+
+def test_switching_converts_only_the_selected_cover(chooser):
+    chooser.select(0, 2)
+    chooser.mode_var.set("wada")
+    chooser.switch_mode()
+
+    assert chooser.rows[0][2].mode == "wada"
+    assert [spec.mode for spec in chooser.rows[0]] == [
+        "classic", "classic", "wada", "classic", "classic"
+    ]
+
+
+def test_switching_without_a_selection_converts_nothing(chooser):
+    chooser.mode_var.set("wada")
+    chooser.switch_mode()
+    assert all(spec.mode == "classic" for spec in chooser.rows[0])
+    assert "Pick a cover" in chooser.status.cget("text")
+
+
+def test_the_radio_follows_the_selection(chooser):
+    chooser.select(0, 0)
+    chooser.mode_var.set("wada")
+    chooser.switch_mode()
+    assert chooser.mode_var.get() == "wada"
+
+    # a neighbour was never converted, so selecting it must report classic
+    chooser.select(0, 1)
+    assert chooser.mode_var.get() == "classic"
+
+
+def test_switching_back_and_forth_loses_nothing(chooser):
+    chooser.select(0, 0)
+    before = chooser.rows[0][0]
+
+    chooser.mode_var.set("wada")
+    chooser.switch_mode()
+    chooser.mode_var.set("classic")
+    chooser.switch_mode()
+
+    assert chooser.rows[0][0] == before
+
+
+def test_breeding_after_a_switch_stays_in_the_new_mode(chooser):
+    """Decision 5 survives the switch: the user crosses between aesthetics,
+    Further never does."""
+    chooser.select(0, 0)
+    chooser.mode_var.set("wada")
+    chooser.switch_mode()
+    chooser.breed("further")
+
+    assert chooser.rows[1]
+    assert all(child.mode == "wada" for child in chooser.rows[1])

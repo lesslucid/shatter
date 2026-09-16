@@ -23,7 +23,8 @@ from shatter.breed import (
     random_seeds,
     resolve_locks,
 )
-from shatter.contact import SheetStyle, describe, thumbnail
+from shatter.color import MODES
+from shatter.contact import SheetStyle, describe, describe_colour, thumbnail
 from shatter.spec import CoverSpec
 
 COLUMNS = 5
@@ -67,6 +68,7 @@ class Chooser:
             gene.name: tk.BooleanVar(master=root, value=gene.name in starting)
             for gene in GENES
         }
+        self.mode_var = tk.StringVar(master=root, value=base.mode)
         self.rows: list[list[CoverSpec]] = [random_seeds(base, COLUMNS, rng), []]
         self.selected: tuple[int, int] | None = None
         self.photos: dict[tuple[int, int], ImageTk.PhotoImage] = {}
@@ -110,6 +112,20 @@ class Chooser:
                 text=gene.name,
                 variable=self.lock_vars[gene.name],
                 command=lambda g=gene: self.explain_lock(g),
+            ).pack(side="left")
+
+        modes = tk.Frame(self.root)
+        modes.pack(pady=(6, 0))
+        # "colour model", not "colour": there is a lock checkbox called `colour`
+        # directly above this row, and the two mean different things.
+        tk.Label(modes, text="colour model:", fg="#666").pack(side="left", padx=(0, 4))
+        for name in MODES:
+            tk.Radiobutton(
+                modes,
+                text=name,
+                value=name,
+                variable=self.mode_var,
+                command=self.switch_mode,
             ).pack(side="left")
 
         controls = tk.Frame(self.root)
@@ -161,10 +177,44 @@ class Chooser:
         return self.spec_at(*self.selected)
 
     def select(self, row: int, column: int) -> None:
-        if self.spec_at(row, column) is None:
+        spec = self.spec_at(row, column)
+        if spec is None:
             return
         self.selected = (row, column)
+        # The radio reports the selection's mode rather than a window-wide
+        # setting. Setting the variable does not fire the widget's command --
+        # tkinter only does that on a click -- so this cannot convert anything.
+        self.mode_var.set(spec.mode)
         self.refresh()
+
+    def switch_mode(self) -> None:
+        """Convert the selected cover to the other colour model.
+
+        Mode is still **not** a gene (section 12.1, decision 5): `Further` never
+        crosses between the two aesthetics, so one button still means one thing
+        and a `colour` lock is still unambiguous about what it holds. This is the
+        user saying which aesthetic to explore, which is the part decision 5
+        always left to them -- it just no longer has to be said at launch.
+
+        Converting is free in both directions because each mode reads only its
+        own fields (decision 15): the classic settings survive a trip through
+        `wada` untouched, and vice versa, so switching back and forth loses
+        nothing.
+        """
+        spec = self.selected_spec()
+        wanted = self.mode_var.get()
+        if spec is None:
+            self.say("Pick a cover first, then switch the colour model.")
+            return
+        if spec.mode == wanted:
+            return
+
+        row, column = self.selected
+        self.rows[row][column] = spec.with_changes(mode=wanted)
+        self.refresh(
+            f"{wanted}: {describe_colour(self.rows[row][column])}. "
+            "Closer or Further to explore it."
+        )
 
     def breed(self, radius_name: str) -> None:
         parent = self.selected_spec()

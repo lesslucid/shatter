@@ -24,7 +24,7 @@ recommendation with reasons over a menu of options.
 ## Getting oriented
 
 ```bash
-.venv/bin/python -m pytest -q          # 315 tests, ~8s
+.venv/bin/python -m pytest -q          # 322 tests, ~9s
 .venv/bin/python -m shatter.cli --help # or `shatter` (editable install)
 ```
 
@@ -67,6 +67,7 @@ on `main`. There is no remote.
 | 12 | Two-colour tiles by prototile shape — `--tile-split by_type` | done |
 | 13 | Sanzo Wada colour mode — `--mode wada`, three role layouts, contrast floor | done |
 | 14 | Breeding the colour genes — mode-aware `colour` gene, decision 9 | done |
+| — | Chooser colour-model switch — reach both aesthetics without relaunching | done |
 
 ## What to do next
 

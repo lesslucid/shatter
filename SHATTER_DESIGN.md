@@ -671,10 +671,19 @@ get variations of it, repeat until you like one.
 
   click a cover to select it
   lock: [ ]shatter [ ]spacing [ ]seed [ ]tiling [x]colour [ ]zoom
+  colour model: ( ) classic  (*) wada
   [ Closer ]  small mutations around the selection
   [ Further ] large mutations around the selection
   [ Print! ]  render the selection full size
 ```
+
+**The colour model** converts the selected cover between the two aesthetics
+(phase 13). It reports the *selection's* model rather than a window-wide setting,
+so clicking between covers shows which each one is, and converting one leaves its
+neighbours alone — which means a row can hold the same shatter in both models
+side by side. Switching is free in either direction: each model reads only its own
+fields (decision 15), so a classic cover's settings survive a trip through `wada`
+untouched. It is **not** a gene — see decision 5.
 
 **Locking** (phase 9) holds a gene still while everything else keeps rolling — tick
 `colour` to hunt for an arrangement without the palette wandering, tick `tiling` and
@@ -1153,10 +1162,19 @@ Agreed before implementation, recorded so they can be revisited rather than re-a
    and a clean rollback point if a colour feature disappoints. The golden-image no-op test
    is what makes the trade worth it.
 
-5. **Colour *mode* is not a mutable gene.** *(decided alongside the four above)* You choose
-   `classic` or `wada` when you launch the chooser, and breeding explores within it.
-   Letting Further jump between aesthetics would make one button mean two incompatible
-   things and would make the `colour` lock ambiguous — locked against what?
+5. **Colour *mode* is not a mutable gene.** *(decided alongside the four above)*
+   Breeding explores within one aesthetic. Letting Further jump between them would make
+   one button mean two incompatible things and would make the `colour` lock ambiguous —
+   locked against what?
+
+   **Amended after phase 14:** this decision originally added "you choose `classic` or
+   `wada` when you launch the chooser", and the chooser now carries a colour-model
+   switch, so that half no longer holds. Nothing else about the decision changes, and
+   the distinction is the point: *the user* crosses between aesthetics, deliberately and
+   one cover at a time; *breeding* still never does. Both reasons above were about
+   `Further`, and both survive intact. Asking someone to relaunch the window to see the
+   other half of the tool was never part of the argument — it was just an assumption
+   about where the choice would be made.
 
 6. **Colour settings stay flat on `CoverSpec`; only the resolved result is an object.**
    *(decided at the start of phase 10)* A nested `ColorScheme` reads tidier and is what an

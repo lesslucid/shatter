@@ -593,3 +593,14 @@ def test_locking_everything_still_yields_copies():
     nothing to force, and a refusal is the honest answer."""
     base = CoverSpec(jitter=0.31)
     assert generation(base, 5, FURTHER, random.Random(3), LOCKABLE) == [base] * 5
+
+
+def test_the_colour_mode_is_never_bred(): 
+    """Decision 5, and still true after the chooser gained a mode switch: the
+    user crosses between aesthetics, breeding does not. A gene owning `mode`
+    would make one Further button mean two incompatible things and leave the
+    `colour` lock ambiguous about what it held."""
+    assert not any("mode" in gene.fields for gene in GENES)
+    for base in (CoverSpec(), CoverSpec(mode="wada")):
+        for child in generation(base, 500, FURTHER, random.Random(2)):
+            assert child.mode == base.mode
