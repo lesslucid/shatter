@@ -28,7 +28,18 @@ recommendation with reasons over a menu of options.
 .venv/bin/python -m shatter.cli --help # or `shatter` (editable install)
 ```
 
-Note: **no commits yet.** `git log` is empty; the branch is `main`.
+Note on git: **the repo root is the parent directory**, `/home/guy/scripts/python`,
+which also holds about ten unrelated projects (`aosiran/`, `todo/`, `turn-snake/`
+and — importantly — `covers/`, the read-only reference of rule 1). Only
+`shattered/` is tracked. **Never `git add -A`**; scope every add to this
+subtree:
+
+```bash
+cd /home/guy/scripts/python && git add shattered/
+```
+
+The baseline commit is `53cf02a`, "Initial commit: shatter, through phase 13",
+on `main`. There is no remote.
 
 ## Hard rules
 
