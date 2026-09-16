@@ -1379,8 +1379,8 @@ Agreed before implementation, recorded so they can be revisited rather than re-a
     to-do**: box-vs-background being soft just produces the medallion-on-plain-
     ground look that section 8 already treats as first-class, whereas a soft
     tile-vs-box is fatal. A third tier would admit those. It is not worth
-    reopening decision 11 now — the offered set is roughly 2,800 assignments,
-    nowhere near thin — but if the pool ever feels narrow, this is the cheapest
+    reopening decision 11 now — the offered set is 3,392 assignments (636 `box`,
+    664 `shapes`, 2,092 `full`), nowhere near thin — but if the pool ever feels narrow, this is the cheapest
     place to widen it.
 
 **Suggested order:** 9 → 10 → (11 and 12, in either order) → 13 → 14. Phases 11 and 12 are
