@@ -1162,7 +1162,7 @@ of combination in over half the cases where the layout holds. `--mode wada --loc
 shatter,spacing,seed,tiling,zoom` produces ten visibly different palettes in one sheet.
 
 
-### 12.1 DECISIONS BEHIND PHASES 9–15
+### 12.1 DECISIONS BEHIND PHASES 9–16
 
 Agreed before implementation, recorded so they can be revisited rather than re-argued.
 
@@ -1450,6 +1450,52 @@ Agreed before implementation, recorded so they can be revisited rather than re-a
     row and a reproduced one — and it was verified afterwards that the narrowed
     guard still catches a genuine extra draw, failing from child 1 on both radii.
     **Do not widen it back.**
+
+20. **The dial steps combinations, not assignments.** *(phase 16.)* One step is
+    one Wada combination at permutation 0, or one classic `(bg, tile, box)`
+    palette — so every entry on a page is a genuinely different colour group. The
+    alternative, stepping every `(combination, permutation)` pair in the order
+    `offered()` already returns them, was measured and rejected: those pairs are
+    combination-major with all six permutations adjacent, so the first page would
+    show the same three colours rearranged five times. It also cuts `box` from
+    127 pages to 22.
+
+21. **Ordered by the background's hue, with chroma as the tiebreak — and no
+    achromatic bucket.** *(phase 16, and the second half is a correction.)* The
+    background is the right role to sort on: it is the largest area and the first
+    thing read. Hue is the right key because hunting a colour is a perceptual
+    search and combination id is arbitrary — exactly the wrong property.
+
+    An earlier version of this decision grouped near-neutral grounds first, on
+    the grounds that hue is meaningless for a grey. **Measurement killed it.** No
+    threshold separates "a pale colour" from "a grey", in either HSV saturation
+    or Lab chroma, because there is nothing there to separate: classic's `#E8F1F2`
+    has *less* Lab chroma (3.2) than the Wada slate that prompted the rule (3.4),
+    and `#F3E3E1` ties another exactly at 5.9. A saturation threshold tuned for
+    Wada's palette would also have swept 9 of the 10 classic pastels into the
+    bucket and destroyed the ordering in that mode entirely.
+
+    Rendered consecutively, plain hue order turns out not to need the rescue: the
+    seven near-neutral Wada grounds land at the end of the blue run, which is
+    where a blue-grey honestly belongs. One rule, both modes, no constant.
+
+22. **The role permutation gets its own control, not a place on the dial.**
+    *(phase 16.)* Having found a combination worth keeping, the six or
+    twenty-four ways of assigning it to roles are the obvious next question, and
+    reaching them through `Further` at the measured rate of decision 10 means
+    waiting for roughly every second row. So the window gets a separate control
+    that cycles the selected cover's permutation among the floor-passing ones.
+    Folding permutations into the dial was rejected as decision 20 explains;
+    leaving them to breeding alone was rejected because it makes the last step of
+    a hunt the slowest.
+
+23. **The dial keeps its position while browsing; breeding re-anchors it.**
+    *(phase 16.)* Paging forward holds its place, so the space can be swept, and
+    clicking one of the covers on show to look at it does not lose that place —
+    a dial you are turning, rather than one that springs back. `Closer` and
+    `Further` reset it, because after breeding the cover you are working from is
+    a different one and the old position means nothing. The position is anchored
+    from the selected cover the first time the dial is used after a reset.
 
 **Suggested order:** 9 → 10 → (11 and 12, in either order) → 13 → 14. Phases 11 and 12 are
 independent of each other once 10 lands, so either can go first or they can be split.
