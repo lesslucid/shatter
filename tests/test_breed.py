@@ -358,10 +358,28 @@ def test_the_mutation_stream_is_unchanged_by_phase_9():
     assert actual == GOLDEN_FURTHER_1234
 
 
+#: Every field any gene can move. The digest covers exactly these.
+MUTABLE_FIELDS = sorted({field for gene in GENES for field in gene.fields})
+
+
 def _spec_digest(spec: CoverSpec) -> str:
-    """A short, stable fingerprint of every field on a spec."""
+    """A short, stable fingerprint of every field mutation can reach.
+
+    Deliberately **not** the whole of `to_dict()`, which is what it hashed when
+    first written. That version had a false positive with teeth: adding *any* new
+    `CoverSpec` field changed every digest, even a field no gene touches and that
+    every child therefore inherits unchanged. Phase 15's `box_corner` tripped it
+    while the mutation stream was provably intact -- the readable table above
+    still passed -- and a guard that cries wolf on additive schema changes trains
+    exactly the casual re-recording that hard rule 2 exists to prevent.
+
+    Hashing the mutable fields loses nothing: a field no gene owns cannot differ
+    between a recorded row and a reproduced one, because it is copied from the
+    parent either way.
+    """
+    values = {field: getattr(spec, field) for field in MUTABLE_FIELDS}
     return hashlib.sha256(
-        json.dumps(spec.to_dict(), sort_keys=True).encode()
+        json.dumps(values, sort_keys=True).encode()
     ).hexdigest()[:12]
 
 
@@ -379,22 +397,25 @@ def _spec_digest(spec: CoverSpec) -> str:
 #: Digests rather than values because sixteen specs of fifteen mutable fields is an
 #: unreadable wall; the index of the first mismatch is the diagnostic, and the
 #: table above says what the early children should actually contain.
-#: Re-recorded at phase 14 with the table above, and for the same reason.
+#: Re-recorded at phase 14 with the table above, and for the same reason. Re-cut
+#: again at phase 15 when `_spec_digest` was narrowed to the mutable fields --
+#: that changed what the digest *is*, not what the stream does, and the readable
+#: table above was untouched by it, which is the evidence the stream held.
 GOLDEN_FURTHER_1234_DIGESTS = [
-    "808ed8fdb878", "97c29f27774c", "3c4a39d72cf6", "cf657b108c1f",
-    "6836c17ff033", "ee5f009d6203", "3fdee1803a16", "39893076a817",
-    "ff5993886128", "5eafd2fa8099", "8f2f47312344", "674d3eb6a525",
-    "f093f4131480", "7e1f053eb742", "a450c8dbc52d", "0fdaf733f89f",
+    "6b32ace97dcc", "fd09cc1c2608", "916a10e85fb4", "a445c24bcb4a",
+    "21e30213e164", "20c0a2870809", "12a53ab687e3", "51428956b896",
+    "e663839b7264", "044979863f63", "4c6e2e76a884", "7a814bb381ea",
+    "1ed80b9f41a8", "6f9c2db9e984", "dcdad9f59bba", "1168144b6b33",
 ]
 
 #: Closer draws from the same stream -- a gated gene still calls `rng.random()`
 #: even when its probability is zero -- so it is a second, independent witness
 #: that the draw order has not moved.
 GOLDEN_CLOSER_1234_DIGESTS = [
-    "a92ac921b4b6", "d0d43e354e48", "e05c5771bdea", "97fa5ab05aea",
-    "71719d68a3bb", "e70fe5a365e4", "a4ffe96da19f", "519bd5df23c4",
-    "de41835776e6", "a3ba176f55bd", "2d2935e8ea58", "e9dcbff2a161",
-    "75e1fddafe3f", "5cfed47a3224", "24af27e18792", "50550d458c15",
+    "f6e9a3a4010a", "8c8c9b511802", "dd53fa99e444", "e1a4adad7bd5",
+    "23b2c178ec14", "58af364f26b9", "fc76b4079e5c", "de2a3ba85f1e",
+    "fba2bca3c617", "a291b05cf65d", "dec93311b488", "4789710f6d84",
+    "d2f2856ac3df", "9ab08df01e22", "636a92b42911", "bb6c162ca411",
 ]
 
 
@@ -604,3 +625,16 @@ def test_the_colour_mode_is_never_bred():
     for base in (CoverSpec(), CoverSpec(mode="wada")):
         for child in generation(base, 500, FURTHER, random.Random(2)):
             assert child.mode == base.mode
+
+
+def test_an_additive_non_bred_field_does_not_disturb_the_stream_guard():
+    """Phase 15's lesson, pinned. `box_corner` is a real field that no gene owns;
+    a child inherits it unchanged, so it cannot be part of what a breed seed
+    promises. If this ever fails, the digest has drifted back to hashing the
+    whole spec and will cry wolf on the next additive field."""
+    assert "box_corner" not in MUTABLE_FIELDS
+    plain = CoverSpec()
+    rounded = CoverSpec(box_corner=0.3)
+    assert _spec_digest(plain) == _spec_digest(rounded)
+    assert all(child.box_corner == 0.3
+               for child in generation(rounded, 20, FURTHER, random.Random(1)))

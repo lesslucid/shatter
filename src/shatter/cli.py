@@ -68,6 +68,20 @@ def combination_id(value: str) -> int:
     return number
 
 
+def corner_fraction(value: str) -> float:
+    """A feature-box corner radius, as a fraction of the box's shorter side.
+
+    Capped at 0.5 because that is already a stadium: Pillow saturates above it,
+    so a larger number would be silently accepted and change nothing.
+    """
+    number = float(value)
+    if not 0.0 <= number <= 0.5:
+        raise argparse.ArgumentTypeError(
+            f"must be in [0, 0.5] -- 0 is square, 0.5 is fully rounded -- got {value}"
+        )
+    return number
+
+
 def non_negative_int(value: str) -> int:
     number = int(value)
     if number < 0:
@@ -154,6 +168,11 @@ def add_presentation_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--border-width", type=float, default=SUPPRESS,
         help="border thickness as a fraction of the median tile radius, not pixels",
+    )
+    parser.add_argument(
+        "--box-corner", type=corner_fraction, default=SUPPRESS, metavar="0-0.5",
+        help="feature-box corner radius as a fraction of its shorter side; "
+             "0 is square (the default), 0.5 fully rounded",
     )
     parser.add_argument("--tile-gap", type=unit_interval, default=SUPPRESS)
     parser.add_argument("--box-margin", type=unit_interval, default=SUPPRESS)

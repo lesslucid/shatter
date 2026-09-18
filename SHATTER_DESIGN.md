@@ -28,10 +28,11 @@ everything but `colour`, press Further, and climb back out of a dark ground.
 the sixteen decisions they were agreed against**, which is the part to read first
 if you are picking this up cold.
 
-**Phases 15–17 are proposed and not started** — rounded feature-box corners, a
-colour dial for hunting through the palette space, and a solid box that clips the
-tiles at its edge. Section 12.2 has all three, with the nine design questions they
-raise recorded as open rather than answered.
+**Phase 15 (rounded feature-box corners) is built** — `--box-corner`, a fraction of
+the box's shorter side, 0.5 a stadium. **Phases 16 and 17 are proposed and not
+started**: a colour dial for hunting through the palette space, and a solid box that
+clips the tiles at its edge. Section 12.2 has all three, with the seven design
+questions still open on 16 and 17 recorded as questions rather than answers.
 
 **Working name:** `shatter` — the package name and the CLI command. (The repo
 folder on disk is `shattered/`; only the *package* name matters to the code, so
@@ -394,6 +395,15 @@ core size per family, so per-family default overrides may eventually be worth it
   (`box_margin`, e.g. 12–18% of the box), and centre it — so the intact pattern
   deliberately does **not** reach the box edges, leaving room for debris and
   breathing space.
+
+- **Corner radius** (`box_corner`, phase 15). 0 is the square box above; higher
+  values round the corners, and **0.5 is a stadium** — the short ends become
+  semicircles. It is a fraction of the box's **shorter side**, not a pixel count,
+  so a chooser thumbnail and a 300dpi print describe the same shape; a radius in
+  pixels could not do that. Values above 0.5 are capped rather than rejected at
+  the renderer, because Pillow saturates there anyway and the cap is better owned
+  here than left as an accident. At exactly 0 the old square drawing path is used
+  unchanged, which is what keeps every golden captured before phase 15 valid.
 
 - **The feature box** is a drawn rectangle on the front cover: fill it with white or
   a darkened shade of the background, then draw the shatter over it. Let broken-out
@@ -1143,7 +1153,7 @@ of combination in over half the cases where the layout holds. `--mode wada --loc
 shatter,spacing,seed,tiling,zoom` produces ten visibly different palettes in one sheet.
 
 
-### 12.1 DECISIONS BEHIND PHASES 9–14
+### 12.1 DECISIONS BEHIND PHASES 9–15
 
 Agreed before implementation, recorded so they can be revisited rather than re-argued.
 
@@ -1388,6 +1398,41 @@ Agreed before implementation, recorded so they can be revisited rather than re-a
     664 `shapes`, 2,092 `full`), nowhere near thin — but if the pool ever feels narrow, this is the cheapest
     place to widen it.
 
+17. **The corner radius is a fraction of the box's shorter side, capped at 0.5.**
+    *(phase 15.)* Pixels cannot work: a 20px radius on a 200px-wide thumbnail and
+    on a 3000px print are different shapes, so a chooser thumbnail would stop
+    predicting what gets printed — the same reason `tile_gap`, `box_margin` and the
+    three margins are all fractions. The shorter side is the reference because it
+    makes 0.5 exactly a stadium, which is a meaningful ceiling rather than an
+    arbitrary one. Pillow saturates above half rather than failing (0.5, 0.6 and
+    1.0 all draw the same shape), so the cap is applied in `box_corner_px` where it
+    can be documented, and the CLI rejects out-of-range values so that a 0.8 that
+    would silently do nothing is a clear error instead.
+
+18. **`box_corner` is not a bred gene.** *(phase 15.)* Registering it would add a
+    draw and break every saved `--breed-seed` for a third time — decision 14 is
+    explicit that this should not happen casually. There is clean precedent for a
+    setting that is deliberately not a gene: `border_width`, `title_band`,
+    `side_margin` and `bottom_margin` are all exactly this. It can be promoted
+    later if it turns out to be something worth stumbling onto rather than
+    choosing, at the cost of one more stream break, and nothing about the field
+    would have to change.
+
+19. **The mutation-stream digest covers the mutable fields, not the whole spec.**
+    *(phase 15, from a false positive.)* As first written it hashed all of
+    `to_dict()`, so adding `box_corner` — a field no gene owns, that every child
+    inherits unchanged — changed all 32 digests while the stream was provably
+    intact, which the readable four-child table confirmed by still passing.
+
+    That is worse than it sounds. A guard that fails on every additive schema
+    change teaches you to re-record it without reading it, which is precisely the
+    habit hard rule 2 exists to prevent, and the next time it fired for a real
+    reason it would be waved through. Narrowing it to the fields mutation can
+    reach loses nothing — a field no gene owns cannot differ between a recorded
+    row and a reproduced one — and it was verified afterwards that the narrowed
+    guard still catches a genuine extra draw, failing from child 1 on both radii.
+    **Do not widen it back.**
+
 **Suggested order:** 9 → 10 → (11 and 12, in either order) → 13 → 14. Phases 11 and 12 are
 independent of each other once 10 lands, so either can go first or they can be split.
 *(All of these are built. Phases 15–17, proposed and not started, are in section 12.2,
@@ -1406,7 +1451,7 @@ The suggested order is **15 → 16 → 17**: 15 is a quick win that lays groundw
 reuses, 16 has the best value-for-risk (it touches no random draws at all), and 17
 is the largest.
 
-**Phase 15 — Rounded feature-box corners.** *(proposed; difficulty: LOW)*
+**Phase 15 — Rounded feature-box corners.** *(done)*
 The feature box is drawn with sharp corners by a single `ImageDraw.rectangle` call in
 `render_front`. Pillow ships `rounded_rectangle` with the same signature plus a
 `radius`, so the drawing change is one line. Add a `box_corner` field to `CoverSpec`,
@@ -1416,23 +1461,26 @@ Prototyped across radii from square to a full lozenge: the look holds up at ever
 value, and a large radius on a narrow box degenerates gracefully into a stadium
 rather than into anything broken.
 
-*Open — settle before code:*
+*Both questions settled before code, as decisions 17 and 18:* the radius is a
+fraction of the box's **shorter side**, capped at 0.5; and it is **not** a bred gene,
+following `border_width` and the three margins, so no saved `--breed-seed` was
+broken by this phase.
 
-1. **The radius must be a fraction, not pixels — of what?** Pixels cannot work: a
-   20px radius on a 200px-wide thumbnail and on a 3000px print are different shapes,
-   so a chooser thumbnail would stop predicting the print. Every other spatial knob
-   in section 8 is a fraction (`tile_gap`, `box_margin`, the three margins), so this
-   should be one too. The open part is the *reference*: the box's shorter side is the
-   obvious candidate, and it makes 0.5 exactly a stadium end.
-2. **Is it a bred gene?** Recommended **no**, at least at first. Adding a gene adds a
-   draw and breaks every saved `--breed-seed` again — decision 14 is explicit about
-   not doing that casually. There is clean precedent for a setting that is not bred:
-   `border_width`, `title_band`, `side_margin` and `bottom_margin` are all exactly
-   this. It can be promoted to a gene later, at the cost of one more stream break.
+*What building it turned up.* One thing, and it was in the test suite rather than
+the feature: the mutation-stream digest added at phase 14 hashed the whole of
+`to_dict()`, so `box_corner` — a field no gene touches — changed all 32 digests
+while the stream was provably intact. It is now narrowed to the mutable fields.
+That is **decision 19**, and it is worth reading before touching that guard again.
 
-*Check:* a default of 0 leaves all 27 goldens byte-identical, since the field is
-additive and the drawing call is unchanged at radius 0; the radius survives a change
-of output size, i.e. a thumbnail and a full-size render describe the same shape.
+*Check (passed):* all 27 pre-existing goldens byte-identical, so nothing that does
+not ask for a rounded corner moved a pixel; radius 0 asserted byte-identical to the
+old `rectangle` call rather than merely assumed; all four corners cut at every
+radius above 0 and the centre never eaten; the radius confirmed proportional to
+output size (30px at 150 wide, 120px at 600) and to supersampling; values of 0.5,
+0.6, 1.0 and 4.0 all clamp to the stadium; a negative radius renders square; a
+config written before phase 15 still loads and renders square; three new goldens,
+including the stadium extreme and a rounded box sharing a cover with a Wada palette
+and tile borders.
 
 **Phase 16 — The colour dial.** *(proposed; difficulty: MEDIUM)*
 `Further` finds new palettes by surprise, which is the point of it, but there is no
@@ -1557,8 +1605,9 @@ The three proposed phases each carry open questions of their own. They are writt
 where the work is, in **section 12.2**, rather than copied here — but they are listed
 so this section stays the place you can find out what is undecided:
 
-- **Rounded corners (phase 15)** — what the radius is a fraction *of*, and whether it
-  becomes a bred gene at the cost of another mutation-stream break. Two questions.
+- ~~**Rounded corners (phase 15)**~~ — **both settled**, as decisions 17 and 18: a
+  fraction of the box's shorter side capped at 0.5, and not a bred gene. Phase 15 is
+  built.
 - **The colour dial (phase 16)** — what one step changes, in what order, where the
   role permutation goes, and where the page state lives. Four questions, and the
   ordering one is load-bearing: the natural order is unusable for the purpose.

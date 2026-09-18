@@ -71,3 +71,16 @@ def test_build_layout_records_the_spec():
     layout = spec.build_layout()
     assert (layout.family, layout.seed) == ("p2", 13)
     assert layout.depth == spec.resolved_depth()
+
+
+def test_a_config_written_before_phase_15_still_loads():
+    """Hard rule 4. `box_corner` is additive with a default, so a config saved
+    before rounded corners existed must still load and still render square."""
+    old = {"family": "p3", "zoom": 150, "seed": 7, "box_margin": 0.15}
+    spec = CoverSpec.from_dict(old)
+    assert spec.box_corner == 0.0
+
+
+def test_the_corner_radius_round_trips():
+    spec = CoverSpec(box_corner=0.35)
+    assert CoverSpec.from_dict(json.loads(json.dumps(spec.to_dict()))) == spec

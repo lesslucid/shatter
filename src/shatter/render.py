@@ -54,6 +54,7 @@ class RenderParams:
     overlap_color: str = "auto"  # "auto" | "none" | "#RRGGBB"
     border: str = "none"  # "none" | "black" | "white"
     border_width: float = 0.12  # fraction of the median tile radius, NOT pixels
+    box_corner: float = 0.0  # corner radius as a fraction of the box's shorter side
     tile_split: str = "single"  # "single" | "by_type" (colour by prototile shape)
     tile_color_b: str = "bg"  # second prototile's fill; only read when by_type
     # Read only when mode="wada" (phase 13). `tile_split` above is a classic-mode
@@ -91,6 +92,42 @@ def box_rect(params: RenderParams, scale: int = 1) -> BoundingBox:
         bleed + width - params.side_margin * width,
         bleed + height - params.bottom_margin * height,
     )
+
+
+def box_corner_px(params: "RenderParams", scale: int = 1) -> float:
+    """The feature box's corner radius in pixels, from the fraction on the spec.
+
+    A fraction of the box's **shorter side** rather than a pixel count, for the
+    same reason `tile_gap` and the margins are fractions (section 8): a chooser
+    thumbnail and a 300dpi print have to describe the same shape, and a radius in
+    pixels would be a different corner on each.
+
+    At 0.5 the short ends are semicircles and the box is a stadium. Pillow
+    saturates quietly above that rather than failing -- 0.5, 0.6 and 1.0 all draw
+    the same shape -- so the clamp is applied here, where it can be documented,
+    instead of being left as an accident of the drawing library.
+    """
+    x0, y0, x1, y1 = box_rect(params, scale)
+    return min(max(params.box_corner, 0.0), 0.5) * min(x1 - x0, y1 - y0)
+
+
+def draw_box(
+    image: Image.Image, params: "RenderParams", color: RGB, scale: int = 1
+) -> None:
+    """Paint the feature box, square or rounded (phase 15).
+
+    Radius 0 deliberately takes the old `rectangle` path rather than calling
+    `rounded_rectangle(radius=0)`. The two ought to agree, but "ought to" is not
+    what the golden suite tests: this way every cover that does not ask for a
+    rounded corner is drawn by exactly the code that drew it before phase 15.
+    """
+    draw = ImageDraw.Draw(image)
+    rect = box_rect(params, scale)
+    radius = box_corner_px(params, scale)
+    if radius <= 0:
+        draw.rectangle(rect, fill=color)
+    else:
+        draw.rounded_rectangle(rect, radius=radius, fill=color)
 
 
 def fit_to_box(
@@ -319,7 +356,7 @@ def render_front(layout: ShatterLayout, params: RenderParams) -> Image.Image:
     size = canvas_size(params, scale)
 
     image = Image.new("RGB", size, palette.background)
-    ImageDraw.Draw(image).rectangle(box_rect(params, scale), fill=palette.box)
+    draw_box(image, params, palette.box, scale)
 
     placed = placed_shapes(layout, params, scale)
     shapes = [tile.points for tile in placed]

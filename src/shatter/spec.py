@@ -50,6 +50,9 @@ class CoverSpec:
     role_permutation: int = 0
     tile_gap: float = 0.08
     box_margin: float = 0.15
+    # Corner radius as a fraction of the box's shorter side; 0 is square, 0.5 a
+    # stadium (phase 15). Not a bred gene -- see section 12.2.
+    box_corner: float = 0.0
     title_band: float = 0.30
     side_margin: float = 0.10
     bottom_margin: float = 0.10
@@ -109,6 +112,7 @@ class CoverSpec:
             role_permutation=self.role_permutation,
             tile_gap=self.tile_gap,
             box_margin=self.box_margin,
+            box_corner=self.box_corner,
             title_band=self.title_band,
             side_margin=self.side_margin,
             bottom_margin=self.bottom_margin,

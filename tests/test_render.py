@@ -11,8 +11,10 @@ from shatter.render import (
     RenderParams,
     at_least,
     border_width_px,
+    box_corner_px,
     box_rect,
     canvas_size,
+    draw_box,
     coverage_map,
     draw_tile_labels,
     draw_tiles,
@@ -451,3 +453,91 @@ def test_an_unknown_tile_split_is_rejected_by_name():
     spec = split_spec(tile_split="rainbow")
     with pytest.raises(ValueError, match="Unknown tile split"):
         rendered(spec)
+
+
+# --- Phase 15: rounded feature-box corners -----------------------------------
+
+CORNER_BG, CORNER_BOX = (0, 0, 0), (255, 255, 255)
+
+
+def box_corners_and_centre(corner, width=200, height=300, scale=1):
+    """Draw just the box on a blank canvas and sample its four corners."""
+    params = RenderParams(width=width, height=height, box_corner=corner)
+    image = Image.new("RGB", (width * scale, height * scale), CORNER_BG)
+    draw_box(image, params, CORNER_BOX, scale)
+    x0, y0, x1, y1 = (round(v) for v in box_rect(params, scale))
+    corners = [
+        image.getpixel(point)
+        for point in ((x0 + 1, y0 + 1), (x1 - 2, y0 + 1),
+                      (x0 + 1, y1 - 2), (x1 - 2, y1 - 2))
+    ]
+    return corners, image.getpixel(((x0 + x1) // 2, (y0 + y1) // 2))
+
+
+def test_a_square_box_fills_its_corners():
+    corners, centre = box_corners_and_centre(0.0)
+    assert corners == [CORNER_BOX] * 4
+    assert centre == CORNER_BOX
+
+
+@pytest.mark.parametrize("corner", [0.1, 0.25, 0.5])
+def test_a_rounded_box_cuts_all_four_corners_away(corner):
+    corners, centre = box_corners_and_centre(corner)
+    assert corners == [CORNER_BG] * 4, "a corner survived the rounding"
+    assert centre == CORNER_BOX, "rounding must not eat the middle of the box"
+
+
+def test_the_radius_is_a_fraction_of_the_shorter_side():
+    params = RenderParams(width=200, height=300, box_corner=0.5)
+    x0, y0, x1, y1 = box_rect(params)
+    assert box_corner_px(params) == pytest.approx(0.5 * min(x1 - x0, y1 - y0))
+
+
+def test_the_radius_scales_with_the_output_size():
+    """The whole reason it is a fraction: a thumbnail and a print must describe
+    the same shape, which a radius in pixels could not do."""
+    small = RenderParams(width=150, height=225, box_corner=0.25)
+    large = RenderParams(width=600, height=900, box_corner=0.25)
+    assert box_corner_px(large) == pytest.approx(4 * box_corner_px(small))
+
+
+def test_the_radius_scales_with_supersampling():
+    params = RenderParams(width=200, height=300, box_corner=0.25)
+    assert box_corner_px(params, 2) == pytest.approx(2 * box_corner_px(params))
+
+
+@pytest.mark.parametrize("corner", [0.5, 0.6, 1.0, 4.0])
+def test_the_radius_is_capped_at_a_stadium(corner):
+    """Pillow saturates above half the shorter side rather than failing, so the
+    cap is applied in `box_corner_px` where it can be documented."""
+    params = RenderParams(width=200, height=300, box_corner=corner)
+    x0, y0, x1, y1 = box_rect(params)
+    assert box_corner_px(params) == pytest.approx(0.5 * min(x1 - x0, y1 - y0))
+
+
+def test_a_negative_radius_is_treated_as_square():
+    assert box_corner_px(RenderParams(width=200, height=300, box_corner=-1.0)) == 0.0
+    corners, _ = box_corners_and_centre(-1.0)
+    assert corners == [CORNER_BOX] * 4
+
+
+def test_radius_zero_is_byte_identical_to_the_pre_phase_15_drawing():
+    """`draw_box` takes the old `rectangle` path at radius 0 deliberately. This
+    is what lets every golden captured before phase 15 stay green."""
+    from PIL import ImageDraw
+
+    params = RenderParams(width=200, height=300, box_corner=0.0)
+    drawn = Image.new("RGB", (200, 300), CORNER_BG)
+    draw_box(drawn, params, CORNER_BOX)
+
+    expected = Image.new("RGB", (200, 300), CORNER_BG)
+    ImageDraw.Draw(expected).rectangle(box_rect(params), fill=CORNER_BOX)
+
+    assert drawn.tobytes() == expected.tobytes()
+
+
+def test_the_corner_reaches_the_renderer_from_the_spec():
+    from shatter.spec import CoverSpec
+
+    assert CoverSpec(box_corner=0.3).render_params(10, 20).box_corner == 0.3
+    assert CoverSpec().render_params(10, 20).box_corner == 0.0

@@ -337,3 +337,22 @@ def test_split_survives_a_config_round_trip(tmp_path):
 def test_an_unknown_tile_split_is_refused(tmp_path):
     with pytest.raises(SystemExit):
         generate(tmp_path / "x", None, "--tile-split", "rainbow")
+
+
+@pytest.mark.parametrize("bad", ["0.8", "-0.1", "1.0"])
+def test_generate_rejects_a_corner_radius_outside_the_range(bad, tmp_path):
+    """0.5 is already a stadium; Pillow saturates above it, so a larger value
+    would be accepted and change nothing. Say so at the flag instead."""
+    with pytest.raises(SystemExit):
+        main(["generate", "--box-corner", bad, "--out", str(tmp_path)])
+
+
+def test_generate_accepts_a_corner_radius_and_carries_it_into_the_config(tmp_path):
+    config = tmp_path / "spec.json"
+    main([
+        "generate", "--zoom", "60", "--box-corner", "0.25", "--only", "front",
+        "--out", str(tmp_path), "--emit-config", str(config),
+    ])
+    from shatter.spec import CoverSpec
+
+    assert CoverSpec.load(config).box_corner == 0.25

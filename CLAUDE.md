@@ -29,17 +29,16 @@ so re-deriving them from scratch will waste your time.
 
 ## Status
 
-**Phases 0–14 are all built and nothing is half-done.** 322 tests pass, with a
-27-image golden suite, and the last commit is a clean working state.
+**Phases 0–15 are all built and nothing is half-done.** 346 tests pass, with a
+30-image golden suite, and the last commit is a clean working state.
 
-**Phases 15–17 are proposed and not started** — rounded feature-box corners, a
-colour dial, and a solid box that clips the tiles at its edge. They are written up
-in design doc **§12.2**, with difficulty ratings and figures that were *measured by
-prototyping*, not estimated. **Each carries open design questions that are
-deliberately unanswered** — nine in total, listed in §12.2 and indexed from §13.
-Settle them with the user before writing code; in all three cases the question is
-the interesting part of the work, and in phase 16 the obvious implementation is the
-wrong one.
+**Phases 16 and 17 are proposed and not started** — a colour dial for hunting the
+palette space in order, and a solid box that overfills and clips the tiles at its
+edge. They are written up in design doc **§12.2**, with difficulty ratings and
+figures that were *measured by prototyping*, not estimated. **Both carry open design
+questions that are deliberately unanswered** — seven in total, listed in §12.2 and
+indexed from §13. Settle them with the user before writing code; in phase 16 the
+obvious implementation is the wrong one, and the write-up says why.
 
 ## Working agreement with this user
 
@@ -72,7 +71,7 @@ pick.
 ## Getting oriented
 
 ```bash
-.venv/bin/python -m pytest -q                        # 322 tests, ~9s
+.venv/bin/python -m pytest -q                        # 346 tests, ~9s
 .venv/bin/shatter --help                             # or python -m shatter.cli
 
 # see something, in each colour model
@@ -123,7 +122,7 @@ All new code is in `src/shatter/`. Nothing here is large; `color.py` and
 1. **Never edit anything under `src/covers/tiling/`.** Vendored verbatim from a
    sibling project and treated as read-only (design doc §2). Add behaviour around
    it, in `src/shatter/`.
-2. **`tests/golden/` is a guard, not a convenience.** 27 reference PNGs, compared
+2. **`tests/golden/` is a guard, not a convenience.** 30 reference PNGs, compared
    pixel-for-pixel. `python tests/make_golden.py` regenerates them — run it only
    when you have *decided* the output should change. Regenerating to turn a red
    test green destroys the guard while leaving the test in place, which is worse
@@ -207,6 +206,12 @@ declined. See Status above.
   what makes the chooser's model switch lossless, but it also means a bred `wada`
   config carries whatever `bg` it started with. Do not "tidy" that by making the
   mutation write both — decision 15 is specifically about not doing that.
+
+- **The mutation-stream digest hashes the *mutable* fields, not the whole spec**
+  (§12.1 decision 19). Adding any new `CoverSpec` field used to change all 32
+  digests even when the stream was untouched — `box_corner` did exactly that at
+  phase 15 — which would teach you to re-record the guard without reading it. If a
+  future change makes you want to hash `to_dict()` again, read decision 19 first.
 
 - **`covers.tiling` has no colour code** and imports only the standard library.
   Prototile tags (`Polygon.tile_type`) survive every geometry transform, which is

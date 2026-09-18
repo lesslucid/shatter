@@ -89,6 +89,15 @@ GOLDEN_SPECS: dict[str, CoverSpec] = {
         zoom=60, family="p2", mode="wada", wada_combination=243,
         role_layout="full", border="black", jitter=0.45,
     ),
+    # Phase 15. A moderate radius and the stadium extreme, because the clamp at
+    # 0.5 is where the drawing library's own behaviour takes over. The third
+    # pins the corner against the busiest thing it can share a cover with.
+    "corner_rounded": CoverSpec(zoom=60, box_corner=0.12),
+    "corner_stadium": CoverSpec(zoom=60, box_corner=0.5),
+    "corner_wada_bordered": CoverSpec(
+        zoom=60, mode="wada", wada_combination=243, role_layout="full",
+        border="black", box_corner=0.2,
+    ),
 }
 
 
