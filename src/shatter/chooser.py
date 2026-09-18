@@ -23,6 +23,7 @@ from shatter.breed import (
     random_seeds,
     resolve_locks,
 )
+from shatter import dial
 from shatter.color import MODES
 from shatter.contact import SheetStyle, describe, describe_colour, thumbnail
 from shatter.spec import CoverSpec
@@ -95,6 +96,11 @@ class Chooser:
         self.corner_var = tk.StringVar(
             master=root, value=corner_preset_name(base.box_corner)
         )
+        # The dial browses independently of the selection (decision 23): clicking
+        # one of the covers it put on screen must not lose your place in the
+        # sweep, so the cover it is walking from is remembered separately.
+        self.dial_anchor: CoverSpec | None = None
+        self.colour_page: int | None = None
         self.rows: list[list[CoverSpec]] = [random_seeds(base, COLUMNS, rng), []]
         self.selected: tuple[int, int] | None = None
         self.photos: dict[tuple[int, int], ImageTk.PhotoImage] = {}
@@ -166,6 +172,19 @@ class Chooser:
                 command=self.switch_corner,
             ).pack(side="left")
 
+        colours = tk.Frame(self.root)
+        colours.pack(pady=(4, 0))
+        tk.Label(colours, text="colours:", fg="#666").pack(side="left", padx=(0, 4))
+        tk.Button(
+            colours, text="\u25c0", width=3, command=lambda: self.dial_step(-1)
+        ).pack(side="left", padx=2)
+        tk.Button(
+            colours, text="\u25b6", width=3, command=lambda: self.dial_step(1)
+        ).pack(side="left", padx=2)
+        tk.Button(
+            colours, text="roles \u21bb", width=8, command=self.cycle_roles
+        ).pack(side="left", padx=(12, 0))
+
         controls = tk.Frame(self.root)
         controls.pack(pady=10)
         tk.Button(
@@ -224,6 +243,11 @@ class Chooser:
         # tkinter only does that on a click -- so this cannot convert anything.
         self.mode_var.set(spec.mode)
         self.corner_var.set(corner_preset_name(spec.box_corner))
+        if row == 0:
+            # Choosing a different cover to work from re-anchors the dial;
+            # clicking one of its own results does not (decision 23).
+            self.dial_anchor = None
+            self.colour_page = None
         self.refresh()
 
     def switch_mode(self) -> None:
@@ -283,6 +307,57 @@ class Chooser:
         self.rows[row][column] = spec.with_changes(box_corner=radius)
         self.refresh(f"box corners: {wanted} ({radius:g}).")
 
+    def dial_step(self, step: int) -> None:
+        """Fill the variations row with the next or previous page of colours.
+
+        This is not breeding: no random draw is made, nothing else about the
+        cover moves, and the same page always holds the same covers. It is a walk
+        through `dial.entries`, which is ordered by the background's hue so that
+        hunting a remembered scheme is a sweep rather than a wait (decisions 20
+        and 21).
+        """
+        if self.dial_anchor is None:
+            anchor = self.selected_spec()
+            if anchor is None:
+                self.say("Pick a cover first, then step through its colours.")
+                return
+            self.dial_anchor = anchor
+            self.colour_page = dial.position(anchor) // dial.PAGE
+
+        total = dial.page_count(self.dial_anchor)
+        self.colour_page = (self.colour_page + step) % total
+        self.rows[1] = dial.page(self.dial_anchor, self.colour_page)
+        self.refresh(
+            f"colours {self.colour_page + 1}/{total} "
+            f"- {describe_colour(self.rows[1][0])} onward. "
+            "Pick one, or keep stepping."
+        )
+
+    def cycle_roles(self) -> None:
+        """Step the selected cover to its next legal role assignment.
+
+        The last move of a hunt (decision 22): the dial finds a combination, this
+        tries the six or twenty-four ways of hanging it on the roles. Only
+        assignments that clear the contrast floor are offered, so this can never
+        produce a cover the mode would not have.
+        """
+        spec = self.selected_spec()
+        if spec is None:
+            self.say("Pick a cover first.")
+            return
+        if spec.mode != "wada":
+            self.say("Only wada covers have a role assignment to cycle.")
+            return
+
+        moved = dial.next_permutation(spec)
+        if moved == spec:
+            self.say("This combination has only one assignment that clears the floor.")
+            return
+
+        row, column = self.selected
+        self.rows[row][column] = moved
+        self.refresh(f"roles: {describe_colour(moved)}.")
+
     def breed(self, radius_name: str) -> None:
         parent = self.selected_spec()
         if parent is None:
@@ -295,6 +370,11 @@ class Chooser:
             # rather than breeding a row of copies.
             self.say(inert_message(radius_name, locked))
             return
+
+        # Breeding moves on from the cover the dial was walking from, so the
+        # old position means nothing (decision 23).
+        self.dial_anchor = None
+        self.colour_page = None
 
         row, column = self.selected
         if row == 1:

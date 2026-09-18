@@ -334,3 +334,109 @@ def test_corner_preset_names_round_trip():
     for name, value in CORNER_PRESETS.items():
         assert corner_preset_name(value) == name
     assert corner_preset_name(0.22) == ""
+
+
+# --- the colour dial ---------------------------------------------------------
+
+
+@pytest.fixture
+def wada_chooser(root, tmp_path):
+    return Chooser(root, CoverSpec(zoom=60, mode="wada"), tmp_path, random.Random(1))
+
+
+def test_stepping_the_dial_without_a_selection_asks_for_one(chooser):
+    chooser.dial_step(1)
+    assert chooser.rows[1] == []
+    assert "Pick a cover" in chooser.status.cget("text")
+
+
+def test_the_dial_fills_the_variations_row_with_recolourings(wada_chooser):
+    """It recolours the selected cover: everything but the palette must survive."""
+    wada_chooser.select(0, 0)
+    parent = wada_chooser.rows[0][0]
+    wada_chooser.dial_step(1)
+
+    assert len(wada_chooser.rows[1]) == COLUMNS
+    for child in wada_chooser.rows[1]:
+        assert child.seed == parent.seed
+        assert child.family == parent.family
+        assert child.core_fraction == parent.core_fraction
+    combinations = [child.wada_combination for child in wada_chooser.rows[1]]
+    assert len(set(combinations)) == COLUMNS
+
+
+def test_the_dial_makes_no_random_draws(wada_chooser):
+    """Phase 16's whole advantage: stepping colours cannot disturb the breeding
+    stream, so a saved --breed-seed still reproduces its row afterwards."""
+    wada_chooser.select(0, 0)
+    before = wada_chooser.rng.getstate()
+    wada_chooser.dial_step(1)
+    wada_chooser.dial_step(1)
+    wada_chooser.cycle_roles()
+    assert wada_chooser.rng.getstate() == before
+
+
+def test_stepping_forward_and_back_returns_to_the_same_page(wada_chooser):
+    wada_chooser.select(0, 0)
+    wada_chooser.dial_step(1)
+    there = [spec.wada_combination for spec in wada_chooser.rows[1]]
+    wada_chooser.dial_step(1)
+    wada_chooser.dial_step(-1)
+    assert [spec.wada_combination for spec in wada_chooser.rows[1]] == there
+
+
+def test_picking_a_cover_the_dial_offered_does_not_lose_your_place(wada_chooser):
+    """Decision 23: browsing is continuous. Clicking one of the results to look
+    at it must not re-anchor the sweep."""
+    wada_chooser.select(0, 0)
+    wada_chooser.dial_step(1)
+    wada_chooser.dial_step(1)
+    page_before = wada_chooser.colour_page
+
+    wada_chooser.select(1, 2)                      # a cover the dial put there
+    assert wada_chooser.colour_page == page_before
+    wada_chooser.dial_step(1)
+    assert wada_chooser.colour_page == page_before + 1
+
+
+def test_choosing_a_different_parent_re_anchors_the_dial(wada_chooser):
+    wada_chooser.select(0, 0)
+    wada_chooser.dial_step(1)
+    assert wada_chooser.dial_anchor is not None
+
+    wada_chooser.select(0, 3)
+    assert wada_chooser.dial_anchor is None
+    assert wada_chooser.colour_page is None
+
+
+def test_breeding_re_anchors_the_dial(wada_chooser):
+    """After breeding you are working from a different cover, so the old
+    position means nothing (decision 23)."""
+    wada_chooser.select(0, 0)
+    wada_chooser.dial_step(1)
+    wada_chooser.breed("further")
+    assert wada_chooser.dial_anchor is None
+    assert wada_chooser.colour_page is None
+
+
+def test_cycling_roles_changes_only_the_assignment(wada_chooser):
+    wada_chooser.select(0, 1)
+    before = wada_chooser.rows[0][1]
+    wada_chooser.cycle_roles()
+    after = wada_chooser.rows[0][1]
+
+    assert after.role_permutation != before.role_permutation
+    assert after.with_changes(role_permutation=before.role_permutation) == before
+
+
+def test_cycling_roles_on_a_classic_cover_says_why_it_did_nothing(chooser):
+    chooser.select(0, 0)
+    before = chooser.rows[0][0]
+    chooser.cycle_roles()
+    assert chooser.rows[0][0] == before
+    assert "wada" in chooser.status.cget("text")
+
+
+def test_cycling_roles_without_a_selection_asks_for_one(wada_chooser):
+    wada_chooser.cycle_roles()
+    assert "Pick a cover" in wada_chooser.status.cget("text")

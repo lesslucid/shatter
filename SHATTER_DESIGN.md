@@ -28,11 +28,11 @@ everything but `colour`, press Further, and climb back out of a dark ground.
 the sixteen decisions they were agreed against**, which is the part to read first
 if you are picking this up cold.
 
-**Phase 15 (rounded feature-box corners) is built** — `--box-corner`, a fraction of
-the box's shorter side, 0.5 a stadium. **Phases 16 and 17 are proposed and not
-started**: a colour dial for hunting through the palette space, and a solid box that
-clips the tiles at its edge. Section 12.2 has all three, with the seven design
-questions still open on 16 and 17 recorded as questions rather than answers.
+**Phases 15 and 16 are built** — `--box-corner` for rounded feature-box corners, and
+a colour dial in the chooser that walks the palette space in hue order so a
+half-remembered scheme can be hunted rather than waited for. **Phase 17 is proposed
+and not started**: a solid box that overfills and clips the tiles at its edge.
+Section 12.2 has all three, with phase 17's three design questions still open.
 
 **Working name:** `shatter` — the package name and the CLI command. (The repo
 folder on disk is `shattered/`; only the *package* name matters to the code, so
@@ -167,6 +167,7 @@ shattered/                      (repo root)
       spec.py                   CoverSpec: the whole recipe for a cover, as one object
       color.py                  the six colour roles: settings -> resolved RGB Palette
       wada.py                   loads the vendored Wada dataset (phase 13)
+      dial.py                   ordered walk through the colour space (phase 16)
       data/
         sanzo_wada_colors.json  VENDORED DATA (section 2's narrow exception)
         SOURCE.md               its provenance and MIT licence; vendored with it
@@ -688,6 +689,7 @@ get variations of it, repeat until you like one.
   lock: [ ]shatter [ ]spacing [ ]seed [ ]tiling [x]colour [ ]zoom
   colour model: ( ) classic  (*) wada
   box corners:  (*) square ( ) soft ( ) round ( ) stadium
+  colours:      [ < ] [ > ]   [ roles ]
   [ Closer ]  small mutations around the selection
   [ Further ] large mutations around the selection
   [ Print! ]  render the selection full size
@@ -708,6 +710,21 @@ this control is the *only* way to explore the setting once the window is open.
 Children inherit the value unchanged, so choosing a corner and breeding keeps it for
 the whole row. A radius set from `--box-corner` that matches none of the four leaves
 every button unlit rather than lighting the nearest, which would misreport the cover.
+
+**The colour dial** is the other way of finding a palette (phase 16). `Further`
+surprises you; the dial lets you *hunt*. `<` and `>` fill the variations row with the
+previous or next five colours this cover could take, ordered by the background's hue
+so that sweeping it is like turning a colour wheel — greys sit at the muted end of
+whichever hue they lean towards, and the whole space is 22 pages in `wada`, 12 in
+`classic`. `roles` cycles the selected cover's role assignment among the ones that
+clear the contrast floor, which is the last step of a hunt once the combination is
+right (decision 22).
+
+**Nothing on this row consumes a random draw.** That is worth stating because it is
+why phase 16 could be built without breaking a single saved `--breed-seed`, and a
+test asserts it by making `random` raise. The dial keeps its place as you step, so a
+sweep can be continuous; `Closer` and `Further` re-anchor it, and so does picking a
+different cover to work from (decision 23).
 
 **Locking** (phase 9) holds a gene still while everything else keeps rolling — tick
 `colour` to hunt for an arrangement without the palette wandering, tick `tiling` and
@@ -1548,7 +1565,7 @@ and tile borders. In the chooser: the radio reports the selection rather than th
 window, converts only the selected cover, leaves every button unlit for a CLI-set
 radius matching no preset, and children inherit the chosen corner through a breed.
 
-**Phase 16 — The colour dial.** *(proposed; difficulty: MEDIUM)*
+**Phase 16 — The colour dial.** *(done)*
 `Further` finds new palettes by surprise, which is the point of it, but there is no
 way to *hunt*. The ask is a control that walks the colour space for the current
 tiling in order — show five, click forward for the next five — so a half-remembered
@@ -1566,28 +1583,35 @@ is recommended before phase 17.
 different colour groups — the first page of `box` is six permutations of combination
 121. Prototyped side by side, the difference is not subtle.
 
-*Open — settle before code:*
+*All four questions settled before code, as decisions 20-23:* one step is one
+combination at its lowest floor-passing assignment; the order is the background's
+hue with chroma as the tiebreak; the role permutation gets its own `roles` control;
+and the dial keeps its place while browsing, re-anchoring on a breed or on choosing
+a different cover to work from.
 
-3. **What does one step of the dial change?** Recommended: one *combination*, at a
-   single representative permutation, so every entry on a page is a genuinely
-   different colour group. That also shrinks `box` from 127 pages to 22.
-4. **In what order?** Recommended: **by hue**, so the dial sweeps reds → oranges →
-   yellows → greens → blues → purples and can be searched the way a colour wheel can.
-   Combination id is stable but arbitrary, which is exactly the wrong property for
-   hunting. Open: hue *of which role* — the background is the largest area and the
-   obvious answer.
-5. **Where does the permutation go?** If the dial steps combinations only, the role
-   assignment needs either a second control or to stay with breeding (decision 10),
-   which already moves it by single swaps at a measured rate.
-6. **Where does the page state live, and when does it reset?** The chooser has two
-   rows with a meaning (`chosen from` / `variations`); a colour page fills the second
-   without breeding. Whether selecting a different cover resets the page is a real
-   choice and should be made deliberately.
+*The one that changed under measurement* was decision 21. It was going to group
+near-neutral grounds first, since hue is meaningless for a grey — and no threshold
+turns out to separate "a pale colour" from "a grey" in either HSV saturation or Lab
+chroma, because there is nothing there to separate. A threshold tuned for Wada's
+palette would additionally have swept 9 of the 10 classic pastels into the bucket.
+Plain hue order needs no rescue: rendered consecutively, the seven near-neutral Wada
+grounds land at the end of the blue run, which is where a blue-grey belongs.
 
-*Check:* stepping the dial changes only colour — every other field of the spec is
-untouched; a full sweep visits every assignment the mode offers exactly once and
-returns to where it started; no call into `breed.py` and no rng consumed, asserted
-rather than assumed.
+*Where it lives.* A new `dial.py`, not `breed.py` and not `color.py`: it is neither
+mutation nor colour resolution but an ordered walk, and keeping it apart is what
+makes "the dial touches no randomness" a property you can see rather than audit.
+
+*Check (passed):* stepping changes colour and nothing else — family, seed, every
+shatter knob and the corner radius asserted untouched across all entries; the order
+is confirmed monotonic in background hue for both modes; every entry the Wada dial
+offers clears the contrast floor; a full sweep visits every entry exactly once with
+none repeated and none skipped, which is why the last page is allowed to be short
+rather than padded from the start; the page index wraps at both ends; a cover the
+floor rejects is not on the dial and starts a sweep from the beginning rather than
+refusing; `roles` cycles only the assignment, stays inside the floor, comes back
+round, and does nothing but say so on a classic cover; and **the rng state is
+byte-identical after stepping the dial and cycling roles**, with a second test that
+makes `random` raise while the dial runs.
 
 **Phase 17 — Solid box, hard cutoff.** *(proposed; difficulty: MEDIUM)*
 Today the shatter is fitted *inside* the box and the flung tiles spill over the edge
@@ -1674,9 +1698,9 @@ so this section stays the place you can find out what is undecided:
 - ~~**Rounded corners (phase 15)**~~ — **both settled**, as decisions 17 and 18: a
   fraction of the box's shorter side capped at 0.5, and not a bred gene. Phase 15 is
   built.
-- **The colour dial (phase 16)** — what one step changes, in what order, where the
-  role permutation goes, and where the page state lives. Four questions, and the
-  ordering one is load-bearing: the natural order is unusable for the purpose.
+- ~~**The colour dial (phase 16)**~~ — **all four settled**, as decisions 20-23.
+  Phase 16 is built. The ordering question was indeed load-bearing, and the answer
+  changed under measurement; decision 21 records what killed the first version.
 - **Solid box (phase 17)** — one setting or two, what becomes of `box_margin`, and
   whether it is an opt-in mode or a widening of the default. Three questions.
 

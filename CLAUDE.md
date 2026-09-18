@@ -29,16 +29,14 @@ so re-deriving them from scratch will waste your time.
 
 ## Status
 
-**Phases 0–15 are all built and nothing is half-done.** 354 tests pass, with a
+**Phases 0–16 are all built and nothing is half-done.** 388 tests pass, with a
 30-image golden suite, and the last commit is a clean working state.
 
-**Phases 16 and 17 are proposed and not started** — a colour dial for hunting the
-palette space in order, and a solid box that overfills and clips the tiles at its
-edge. They are written up in design doc **§12.2**, with difficulty ratings and
-figures that were *measured by prototyping*, not estimated. **Both carry open design
-questions that are deliberately unanswered** — seven in total, listed in §12.2 and
-indexed from §13. Settle them with the user before writing code; in phase 16 the
-obvious implementation is the wrong one, and the write-up says why.
+**Phase 17 is proposed and not started** — a solid box that overfills the feature box
+and clips the tiles at its edge, as an alternative to the floating-debris look. It is
+written up in design doc **§12.2**, with difficulty ratings and figures *measured by
+prototyping*, not estimated, and **three open design questions that are deliberately
+unanswered** (indexed from §13). Settle them with the user before writing code.
 
 ## Working agreement with this user
 
@@ -71,7 +69,7 @@ pick.
 ## Getting oriented
 
 ```bash
-.venv/bin/python -m pytest -q                        # 354 tests, ~10s
+.venv/bin/python -m pytest -q                        # 388 tests, ~15s
 .venv/bin/shatter --help                             # or python -m shatter.cli
 
 # see something, in each colour model
@@ -106,6 +104,7 @@ All new code is in `src/shatter/`. Nothing here is large; `color.py` and
 | `color.py` | the six colour roles, both models, Lab maths, the contrast floor |
 | `breed.py` | mutation rules, the six lockable genes, the radii |
 | `wada.py` | loads the vendored dataset; stdlib only, knows nothing about colour |
+| `dial.py` | the colour dial — an ordered, hue-sorted walk of the palette space; makes **no random draws**, which is why it disturbs no breed seed |
 | `spec.py` | `CoverSpec` — the whole recipe for a cover, as one serialisable object |
 | `render.py` | layout → Pillow image; receives a resolved `Palette` and does no colour reasoning |
 | `autoshatter.py` | the parametric layout generator — "the look" lives here |
@@ -212,6 +211,10 @@ declined. See Status above.
   digests even when the stream was untouched — `box_corner` did exactly that at
   phase 15 — which would teach you to re-record the guard without reading it. If a
   future change makes you want to hash `to_dict()` again, read decision 19 first.
+
+- **`CoverSpec` is a plain dataclass, so it is unhashable.** `set()` and `dict`
+  keys over specs raise `TypeError`; compare on `to_dict()` instead. It bites in
+  tests more than in code.
 
 - **`covers.tiling` has no colour code** and imports only the standard library.
   Prototile tags (`Polygon.tile_type`) survive every geometry transform, which is
