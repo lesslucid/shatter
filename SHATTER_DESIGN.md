@@ -1179,7 +1179,7 @@ of combination in over half the cases where the layout holds. `--mode wada --loc
 shatter,spacing,seed,tiling,zoom` produces ten visibly different palettes in one sheet.
 
 
-### 12.1 DECISIONS BEHIND PHASES 9–16
+### 12.1 DECISIONS BEHIND PHASES 9–17
 
 Agreed before implementation, recorded so they can be revisited rather than re-argued.
 
@@ -1513,6 +1513,47 @@ Agreed before implementation, recorded so they can be revisited rather than re-a
     `Further` reset it, because after breeding the cover you are working from is
     a different one and the old position means nothing. The position is anchored
     from the selected cover the first time the dial is used after a reset.
+
+24. **The solid look is two orthogonal settings, not a mode.** *(phase 17.)*
+    Clipping the tiles to the box is one boolean; pushing the patch past the box
+    edge is the existing `box_margin` going negative. Prototyping showed the two
+    are independently useful — clipping at the default margin gives a legible
+    look of its own, debris cut at the edge with the box still breathing — so
+    welding them into one named mode would remove a real option to buy a shorter
+    explanation. Four looks come out of the two knobs: float (the default), clip
+    only, clip with overfill, and overfill without clipping.
+
+    This also answers the mode question without needing a mode. Decision 2 made
+    Wada opt-in so that section 1's plain register stayed true of the *default*;
+    here the default is untouched for free, because clipping is off unless asked
+    for. The chooser offers named presets over the two fields, the way it already
+    does for corner radii — names where they help a hand, orthogonal fields
+    underneath.
+
+25. **`box_margin` gains negative values rather than a second overfill knob.**
+    *(phase 17.)* It keeps its meaning — the inset as a fraction of the box — and
+    negative simply insets the other way. A separate `overfill` multiplier would
+    have been a second knob doing the same arithmetic, live only in one mode, and
+    needing its interaction with the first documented.
+
+    Measured, the band that reaches full coverage is **-0.035 to -0.20** depending
+    on the box's shape and the family's patch aspect; past about -0.25 the intact
+    core fills the frame and the shatter stops being visible at all.
+
+    **The consequence that needed handling:** `box_margin` is bred, clamped to
+    (0.05, 0.30), so a solid cover would have been dragged back to 0.05 by its
+    first mutation and quietly lost the look. The drift range therefore depends on
+    `clip_tiles`. That costs nothing in the mutation stream — `_drift` draws its
+    gaussian either way and only the clamp moves — so no saved `--breed-seed`
+    breaks, which was checked rather than assumed.
+
+26. **`clip_tiles` is not bred, and gets a chooser control.** *(phase 17.)* Not
+    bred for decision 18's reason: it would add a draw and break every saved breed
+    seed again, and it is a deliberate aesthetic choice rather than something
+    worth stumbling onto. And *because* it is not bred, the window is the only
+    place it can be explored — the pairing that decision 18 failed to anticipate
+    for corners and that is applied here from the start rather than after being
+    asked for.
 
 **Suggested order:** 9 → 10 → (11 and 12, in either order) → 13 → 14. Phases 11 and 12 are
 independent of each other once 10 lands, so either can go first or they can be split.
