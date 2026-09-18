@@ -84,3 +84,14 @@ def test_a_config_written_before_phase_15_still_loads():
 def test_the_corner_radius_round_trips():
     spec = CoverSpec(box_corner=0.35)
     assert CoverSpec.from_dict(json.loads(json.dumps(spec.to_dict()))) == spec
+
+
+def test_a_config_written_before_phase_17_still_loads():
+    old = {"family": "p3", "zoom": 150, "box_margin": 0.15}
+    spec = CoverSpec.from_dict(old)
+    assert spec.clip_tiles is False
+
+
+def test_a_solid_cover_round_trips():
+    spec = CoverSpec(clip_tiles=True, box_margin=-0.12, box_corner=0.2)
+    assert CoverSpec.from_dict(json.loads(json.dumps(spec.to_dict()))) == spec

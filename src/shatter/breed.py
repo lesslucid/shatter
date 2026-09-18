@@ -47,6 +47,15 @@ SHATTER_KNOBS = (
 )
 SPACING_KNOBS = ("tile_gap", "box_margin")
 
+#: How far `box_margin` may drift for a clipped cover. `KNOB_RANGES` stops at
+#: 0.05, which would drag a solid cover back to a floating one on its first
+#: mutation and silently lose the look (decision 25). Past about -0.25 the intact
+#: core fills the frame and the shatter stops being visible, so that is the floor.
+#:
+#: Changing a clamp costs nothing in the mutation stream: `_drift` draws its
+#: gaussian either way, and only where the result lands moves.
+CLIPPED_BOX_MARGIN_FLOOR = -0.25
+
 SEED_LIMIT = 1_000_000
 
 FAMILIES = ("p2", "p3", "pinwheel")
@@ -175,10 +184,23 @@ def _other(options, current, rng: random.Random):
     return rng.choice(alternatives) if alternatives else current
 
 
+def knob_bounds(knob: str, spec: CoverSpec) -> tuple[float, float]:
+    """The range a knob may drift in, for this cover.
+
+    Only `box_margin` reads the spec, and only to let a clipped cover keep
+    overfilling its box (decision 25). Everything else is `KNOB_RANGES` as it
+    stands.
+    """
+    low, high = KNOB_RANGES[knob]
+    if knob == "box_margin" and spec.clip_tiles:
+        return (CLIPPED_BOX_MARGIN_FLOOR, high)
+    return (low, high)
+
+
 def _drift(spec: CoverSpec, radius: Radius, rng: random.Random, knobs) -> Changes:
     changes: Changes = {}
     for knob in knobs:
-        low, high = KNOB_RANGES[knob]
+        low, high = knob_bounds(knob, spec)
         drift = rng.gauss(0.0, radius.knob_scale * (high - low))
         changes[knob] = min(high, max(low, getattr(spec, knob) + drift))
     return changes

@@ -440,3 +440,60 @@ def test_cycling_roles_on_a_classic_cover_says_why_it_did_nothing(chooser):
 def test_cycling_roles_without_a_selection_asks_for_one(wada_chooser):
     wada_chooser.cycle_roles()
     assert "Pick a cover" in wada_chooser.status.cget("text")
+
+
+# --- the tiles (float / clipped / solid) control ------------------------------
+
+
+def test_the_tiles_radio_starts_on_the_launched_look(root, tmp_path):
+    window = Chooser(
+        root, CoverSpec(zoom=60, clip_tiles=True, box_margin=-0.1), tmp_path,
+        random.Random(1),
+    )
+    assert window.fit_var.get() == "solid"
+
+
+def test_the_three_looks_are_derived_from_the_two_fields(chooser):
+    from shatter.chooser import tile_fit_name
+
+    assert tile_fit_name(CoverSpec()) == "float"
+    assert tile_fit_name(CoverSpec(clip_tiles=True)) == "clipped"
+    assert tile_fit_name(CoverSpec(clip_tiles=True, box_margin=-0.1)) == "solid"
+
+
+def test_choosing_solid_clips_and_overfills(chooser):
+    chooser.select(0, 0)
+    chooser.fit_var.set("solid")
+    chooser.switch_fit()
+
+    spec = chooser.rows[0][0]
+    assert spec.clip_tiles is True and spec.box_margin < 0
+
+
+def test_coming_back_from_solid_drops_the_overfill(chooser):
+    """Otherwise it would still read as solid and the radio would fight you."""
+    chooser.select(0, 0)
+    chooser.fit_var.set("solid")
+    chooser.switch_fit()
+    chooser.fit_var.set("clipped")
+    chooser.switch_fit()
+
+    spec = chooser.rows[0][0]
+    assert spec.clip_tiles is True and spec.box_margin >= 0
+    assert chooser.fit_var.get() == "clipped"
+
+
+def test_switching_tiles_converts_only_the_selected_cover(chooser):
+    chooser.select(0, 2)
+    chooser.fit_var.set("solid")
+    chooser.switch_fit()
+    assert [spec.clip_tiles for spec in chooser.rows[0]] == [
+        False, False, True, False, False
+    ]
+
+
+def test_switching_tiles_without_a_selection_converts_nothing(chooser):
+    chooser.fit_var.set("solid")
+    chooser.switch_fit()
+    assert all(spec.clip_tiles is False for spec in chooser.rows[0])
+    assert "Pick a cover" in chooser.status.cget("text")

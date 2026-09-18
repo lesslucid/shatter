@@ -55,6 +55,7 @@ class RenderParams:
     border: str = "none"  # "none" | "black" | "white"
     border_width: float = 0.12  # fraction of the median tile radius, NOT pixels
     box_corner: float = 0.0  # corner radius as a fraction of the box's shorter side
+    clip_tiles: bool = False  # cut the tiles off at the box edge (phase 17)
     tile_split: str = "single"  # "single" | "by_type" (colour by prototile shape)
     tile_color_b: str = "bg"  # second prototile's fill; only read when by_type
     # Read only when mode="wada" (phase 13). `tile_split` above is a classic-mode
@@ -130,10 +131,33 @@ def draw_box(
         draw.rounded_rectangle(rect, radius=radius, fill=color)
 
 
+def box_mask(params: "RenderParams", size: tuple[int, int], scale: int = 1) -> Image.Image:
+    """An L-mode mask that is white inside the feature box and black outside.
+
+    Drawn from the same rect and radius as `draw_box`, so a clipped cover cuts
+    exactly where its box is painted -- including when the corners are rounded
+    (phase 15), which is the whole reason the two compose for free.
+    """
+    mask = Image.new("L", size, 0)
+    draw = ImageDraw.Draw(mask)
+    rect = box_rect(params, scale)
+    radius = box_corner_px(params, scale)
+    if radius <= 0:
+        draw.rectangle(rect, fill=255)
+    else:
+        draw.rounded_rectangle(rect, radius=radius, fill=255)
+    return mask
+
+
 def fit_to_box(
     patch: BoundingBox, box: BoundingBox, margin: float
 ) -> Callable[[Point], Point]:
     """Uniform scale + translate putting the patch inside the box with margin.
+
+    A **negative** margin is legal and is how the solid look is reached (phase
+    17): the patch scales past the box edge instead of stopping short of it, and
+    `clip_tiles` then cuts it off there. The arithmetic is unchanged -- `1 - 2m`
+    simply grows above 1 -- which is why this needed no second knob (decision 25).
 
     Flips the y axis: patches use maths convention (y up), images don't.
     """
@@ -360,9 +384,17 @@ def render_front(layout: ShatterLayout, params: RenderParams) -> Image.Image:
 
     placed = placed_shapes(layout, params, scale)
     shapes = [tile.points for tile in placed]
-    draw_tiles(image, fill_groups(placed, palette, params, layout.family), palette, size)
+
+    # With clipping on, the tiles go onto their own copy of the canvas and are
+    # composited back through the box mask. Doing it with one mask at the end,
+    # rather than clipping each pass, is what keeps the fills, the overlap
+    # composite and the borders cut at exactly the same edge.
+    target = image.copy() if params.clip_tiles else image
+    draw_tiles(target, fill_groups(placed, palette, params, layout.family), palette, size)
     if palette.border is not None:
-        draw_borders(image, shapes, palette.border, border_width_px(shapes, params))
+        draw_borders(target, shapes, palette.border, border_width_px(shapes, params))
+    if params.clip_tiles:
+        image.paste(target, (0, 0), box_mask(params, size, scale))
 
     if scale > 1:
         image = image.resize(canvas_size(params), Image.LANCZOS)

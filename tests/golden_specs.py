@@ -98,6 +98,20 @@ GOLDEN_SPECS: dict[str, CoverSpec] = {
         zoom=60, mode="wada", wada_combination=243, role_layout="full",
         border="black", box_corner=0.2,
     ),
+    # Phase 17. Clipping at the default margin is its own look, so it is pinned
+    # separately from the overfilled one. The third is the busiest clipped path:
+    # borders and an overlap composite both have to stop at the same edge as the
+    # fills, and they are drawn by different passes.
+    "clipped_only": CoverSpec(zoom=60, clip_tiles=True, max_push=0.9),
+    "solid_box": CoverSpec(zoom=60, clip_tiles=True, box_margin=-0.10),
+    "solid_rounded_wada": CoverSpec(
+        zoom=60, mode="wada", wada_combination=126, clip_tiles=True,
+        box_margin=-0.10, box_corner=0.2,
+    ),
+    "clipped_bordered_overlap": CoverSpec(
+        zoom=60, family="p2", clip_tiles=True, box_margin=-0.05,
+        border="black", tile_color="dark", jitter=0.45,
+    ),
 }
 
 

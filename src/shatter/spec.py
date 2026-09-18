@@ -53,6 +53,9 @@ class CoverSpec:
     # Corner radius as a fraction of the box's shorter side; 0 is square, 0.5 a
     # stadium (phase 15). Not a bred gene -- see section 12.2.
     box_corner: float = 0.0
+    # Cut the tiles off at the box edge instead of letting them spill onto the
+    # ground (phase 17). Not a bred gene -- section 12.1, decision 26.
+    clip_tiles: bool = False
     title_band: float = 0.30
     side_margin: float = 0.10
     bottom_margin: float = 0.10
@@ -113,6 +116,7 @@ class CoverSpec:
             tile_gap=self.tile_gap,
             box_margin=self.box_margin,
             box_corner=self.box_corner,
+            clip_tiles=self.clip_tiles,
             title_band=self.title_band,
             side_margin=self.side_margin,
             bottom_margin=self.bottom_margin,

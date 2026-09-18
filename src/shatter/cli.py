@@ -68,6 +68,24 @@ def combination_id(value: str) -> int:
     return number
 
 
+def box_margin_fraction(value: str) -> float:
+    """The feature box's inset, which may be negative (phase 17).
+
+    Negative pushes the patch *past* the box edge instead of stopping short of
+    it, which is how the solid look is reached once `--clip-tiles` is on.
+    Measured, -0.035 to -0.20 reaches full coverage depending on the box's shape;
+    past about -0.25 the intact core fills the frame and the shatter stops being
+    visible. The floor here is looser than that on purpose -- it is a guard
+    against a typo, not a judgement about taste.
+    """
+    number = float(value)
+    if not -0.5 <= number < 1.0:
+        raise argparse.ArgumentTypeError(
+            f"must be in [-0.5, 1) -- negative overfills the box -- got {value}"
+        )
+    return number
+
+
 def corner_fraction(value: str) -> float:
     """A feature-box corner radius, as a fraction of the box's shorter side.
 
@@ -175,7 +193,16 @@ def add_presentation_arguments(parser: argparse.ArgumentParser) -> None:
              "0 is square (the default), 0.5 fully rounded",
     )
     parser.add_argument("--tile-gap", type=unit_interval, default=SUPPRESS)
-    parser.add_argument("--box-margin", type=unit_interval, default=SUPPRESS)
+    parser.add_argument(
+        "--box-margin", type=box_margin_fraction, default=SUPPRESS,
+        help="how far the patch sits inside the feature box; negative overfills "
+             "it, which with --clip-tiles gives the solid look",
+    )
+    parser.add_argument(
+        "--clip-tiles", dest="clip_tiles", action="store_true", default=SUPPRESS,
+        help="cut the tiles off at the box edge instead of letting them spill "
+             "onto the background",
+    )
     parser.add_argument("--title-band", type=unit_interval, default=SUPPRESS)
     parser.add_argument("--side-margin", type=unit_interval, default=SUPPRESS)
     parser.add_argument("--bottom-margin", type=unit_interval, default=SUPPRESS)

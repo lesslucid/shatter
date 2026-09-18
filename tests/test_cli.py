@@ -356,3 +356,22 @@ def test_generate_accepts_a_corner_radius_and_carries_it_into_the_config(tmp_pat
     from shatter.spec import CoverSpec
 
     assert CoverSpec.load(config).box_corner == 0.25
+
+
+@pytest.mark.parametrize("bad", ["-0.6", "1.0", "2"])
+def test_generate_rejects_a_box_margin_outside_the_range(bad, tmp_path):
+    with pytest.raises(SystemExit):
+        main(["generate", "--box-margin", bad, "--out", str(tmp_path)])
+
+
+def test_generate_accepts_the_solid_look(tmp_path):
+    """A negative margin overfills the box and --clip-tiles cuts it there."""
+    config = tmp_path / "solid.json"
+    main([
+        "generate", "--zoom", "60", "--box-margin", "-0.1", "--clip-tiles",
+        "--only", "front", "--out", str(tmp_path), "--emit-config", str(config),
+    ])
+    from shatter.spec import CoverSpec
+
+    spec = CoverSpec.load(config)
+    assert spec.clip_tiles is True and spec.box_margin == -0.1

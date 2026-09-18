@@ -7,7 +7,16 @@
 flung outward and rotated toward the rim, thinning into debris. It renders **no
 text**; a collaborator sets the type afterwards.
 
-It has **two colour models**, and knowing that up front saves a lot of confusion:
+It has **two colour models** and **two composition looks**, and knowing that up
+front saves a lot of confusion.
+
+The composition looks are one boolean apart: by default the flung tiles spill past
+the feature box and float on the plain ground, and with `--clip-tiles` they are cut
+dead at its edge. A *negative* `box_margin` overfills the box so the tiles reach its
+corners — that plus clipping is the "solid" look. The two are independent on purpose
+(§12.1 decision 24).
+
+The colour models:
 
 - **`classic`** (the default) — a plain pastel ground, a white or darkened box,
   tiles in one of three derived colours. Nine combinations in total. This is the
@@ -29,14 +38,13 @@ so re-deriving them from scratch will waste your time.
 
 ## Status
 
-**Phases 0–16 are all built and nothing is half-done.** 388 tests pass, with a
-30-image golden suite, and the last commit is a clean working state.
+**Phases 0–17 are all built and nothing is half-done.** 414 tests pass, with a
+34-image golden suite, and the last commit is a clean working state.
 
-**Phase 17 is proposed and not started** — a solid box that overfills the feature box
-and clips the tiles at its edge, as an alternative to the floating-debris look. It is
-written up in design doc **§12.2**, with difficulty ratings and figures *measured by
-prototyping*, not estimated, and **three open design questions that are deliberately
-unanswered** (indexed from §13). Settle them with the user before writing code.
+There is no next phase. Design doc §12.2's three later features (rounded corners, the
+colour dial, the solid box) are done, and their nine design questions are settled as
+§12.1 decisions 17–26. What remains is in **§13 (open items)** and **§14 (not
+building now)**, plus the short list below — none of it committed work.
 
 ## Working agreement with this user
 
@@ -69,7 +77,7 @@ pick.
 ## Getting oriented
 
 ```bash
-.venv/bin/python -m pytest -q                        # 388 tests, ~15s
+.venv/bin/python -m pytest -q                        # 414 tests, ~25s
 .venv/bin/shatter --help                             # or python -m shatter.cli
 
 # see something, in each colour model
@@ -121,7 +129,7 @@ All new code is in `src/shatter/`. Nothing here is large; `color.py` and
 1. **Never edit anything under `src/covers/tiling/`.** Vendored verbatim from a
    sibling project and treated as read-only (design doc §2). Add behaviour around
    it, in `src/shatter/`.
-2. **`tests/golden/` is a guard, not a convenience.** 30 reference PNGs, compared
+2. **`tests/golden/` is a guard, not a convenience.** 34 reference PNGs, compared
    pixel-for-pixel. `python tests/make_golden.py` regenerates them — run it only
    when you have *decided* the output should change. Regenerating to turn a red
    test green destroys the guard while leaving the test in place, which is worse
@@ -166,9 +174,10 @@ None of this is unfinished work — each was considered and left alone on purpos
   would mean two incompatible aesthetics and `lock colour` would become ambiguous.
 - **§13 open items** — box-aware vs radial shatter, a patch-rotation knob.
 - **§14** — the interactive editor, and everything else consciously excluded.
-
-Distinct from those: **phases 15–17 in §12.2 are wanted but unstarted**, not
-declined. See Status above.
+- **Clicking a cover leaves the status line reading "Rendering..."** — `refresh()`
+  sets that placeholder and only overwrites it when given a message, and `select()`
+  passes none. Cosmetic, one line, noticed during phase 17 and deliberately not
+  fixed in that commit to keep it focused.
 
 ## Gotchas that have already cost time
 

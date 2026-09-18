@@ -44,6 +44,23 @@ ROW_LABELS = ("chosen from", "variations")
 #: outside the chooser has any reason to know the names.
 CORNER_PRESETS = {"square": 0.0, "soft": 0.08, "round": 0.2, "stadium": 0.5}
 
+#: How far a "solid" cover overfills its box. Inside the measured band that
+#: reaches full coverage (-0.035 to -0.20) without going so far that the shatter
+#: stops being visible -- see section 12.1, decision 25.
+SOLID_BOX_MARGIN = -0.10
+
+#: The three looks phase 17 opens, over the two orthogonal fields underneath
+#: (decision 24). Names where they help a hand; `clip_tiles` and `box_margin`
+#: stay independently settable from the CLI.
+TILE_FITS = ("float", "clipped", "solid")
+
+
+def tile_fit_name(spec: CoverSpec) -> str:
+    """Which of the three looks a cover is currently wearing."""
+    if not spec.clip_tiles:
+        return "float"
+    return "solid" if spec.box_margin < 0 else "clipped"
+
 
 def corner_preset_name(value: float) -> str:
     """The preset a radius matches, or "" for a value only the CLI can set.
@@ -96,6 +113,7 @@ class Chooser:
         self.corner_var = tk.StringVar(
             master=root, value=corner_preset_name(base.box_corner)
         )
+        self.fit_var = tk.StringVar(master=root, value=tile_fit_name(base))
         # The dial browses independently of the selection (decision 23): clicking
         # one of the covers it put on screen must not lose your place in the
         # sweep, so the cover it is walking from is remembered separately.
@@ -172,6 +190,18 @@ class Chooser:
                 command=self.switch_corner,
             ).pack(side="left")
 
+        fits = tk.Frame(self.root)
+        fits.pack(pady=(4, 0))
+        tk.Label(fits, text="tiles:", fg="#666").pack(side="left", padx=(0, 4))
+        for name in TILE_FITS:
+            tk.Radiobutton(
+                fits,
+                text=name,
+                value=name,
+                variable=self.fit_var,
+                command=self.switch_fit,
+            ).pack(side="left")
+
         colours = tk.Frame(self.root)
         colours.pack(pady=(4, 0))
         tk.Label(colours, text="colours:", fg="#666").pack(side="left", padx=(0, 4))
@@ -243,6 +273,7 @@ class Chooser:
         # tkinter only does that on a click -- so this cannot convert anything.
         self.mode_var.set(spec.mode)
         self.corner_var.set(corner_preset_name(spec.box_corner))
+        self.fit_var.set(tile_fit_name(spec))
         if row == 0:
             # Choosing a different cover to work from re-anchors the dial;
             # clicking one of its own results does not (decision 23).
@@ -306,6 +337,40 @@ class Chooser:
         row, column = self.selected
         self.rows[row][column] = spec.with_changes(box_corner=radius)
         self.refresh(f"box corners: {wanted} ({radius:g}).")
+
+    def switch_fit(self) -> None:
+        """Move the selected cover between floating, clipped and solid.
+
+        Three names over two orthogonal fields (decision 24): `float` lets the
+        debris spill onto the ground as it always has, `clipped` cuts it at the
+        box edge, and `solid` also overfills the box so the tiles reach its
+        corners. `clip_tiles` and `box_margin` remain separately settable from
+        the CLI -- this is the shortcut, not the model.
+
+        Like the other two switches it converts the selection rather than the
+        window, so a row can hold all three looks side by side.
+        """
+        spec = self.selected_spec()
+        wanted = self.fit_var.get()
+        if spec is None:
+            self.say("Pick a cover first, then choose how the tiles sit.")
+            return
+        if tile_fit_name(spec) == wanted:
+            return
+
+        if wanted == "float":
+            changed = spec.with_changes(clip_tiles=False)
+        elif wanted == "solid":
+            changed = spec.with_changes(clip_tiles=True, box_margin=SOLID_BOX_MARGIN)
+        else:
+            # Coming back from solid, the overfill has to go or it would still
+            # read as solid; anything already positive is the user's and is kept.
+            margin = spec.box_margin if spec.box_margin >= 0 else CoverSpec().box_margin
+            changed = spec.with_changes(clip_tiles=True, box_margin=margin)
+
+        row, column = self.selected
+        self.rows[row][column] = changed
+        self.refresh(f"tiles: {wanted} (box margin {changed.box_margin:+.2f}).")
 
     def dial_step(self, step: int) -> None:
         """Fill the variations row with the next or previous page of colours.

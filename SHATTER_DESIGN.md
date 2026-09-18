@@ -28,11 +28,11 @@ everything but `colour`, press Further, and climb back out of a dark ground.
 the sixteen decisions they were agreed against**, which is the part to read first
 if you are picking this up cold.
 
-**Phases 15 and 16 are built** — `--box-corner` for rounded feature-box corners, and
-a colour dial in the chooser that walks the palette space in hue order so a
-half-remembered scheme can be hunted rather than waited for. **Phase 17 is proposed
-and not started**: a solid box that overfills and clips the tiles at its edge.
-Section 12.2 has all three, with phase 17's three design questions still open.
+**Phases 15, 16 and 17 are built**, and with them section 12.2 is complete:
+`--box-corner` for rounded feature-box corners; a colour dial in the chooser that
+walks the palette space in hue order so a half-remembered scheme can be hunted
+rather than waited for; and `--clip-tiles` with a negative `box_margin` for a solid
+box whose tiles stop dead at its edge.
 
 **Working name:** `shatter` — the package name and the CLI command. (The repo
 folder on disk is `shattered/`; only the *package* name matters to the code, so
@@ -397,6 +397,26 @@ core size per family, so per-family default overrides may eventually be worth it
   deliberately does **not** reach the box edges, leaving room for debris and
   breathing space.
 
+  **A negative `box_margin` reverses that** (phase 17): the patch scales *past* the
+  box edge instead of stopping short of it. The arithmetic is unchanged — `1 - 2m`
+  simply grows above 1 — which is why the solid look needed no second knob
+  (decision 25). Measured, **-0.035 to -0.20** reaches full coverage depending on
+  the box's shape and the family's patch aspect; past about **-0.25** the intact
+  core fills the frame and the shatter stops being visible at all.
+
+- **Clipping** (`clip_tiles`, phase 17). Off by default, which is the whole of
+  section 1's look: the tiles spill past the box and float on the plain ground.
+  On, they are cut dead at the box edge and nothing shows outside it. The tiles
+  are drawn onto their own copy of the canvas and composited back through a single
+  box-shaped mask, rather than each pass clipping itself — that is what makes the
+  fills, the overlap composite and the borders stop at exactly the same edge, and
+  it is why a rounded box (phase 15) clips on its curve for free.
+
+  Clipping and overfill are **independent** (decision 24). Clipping at the default
+  margin is a look of its own — debris cut at the edge with the box still
+  breathing — and overfilling without clipping simply throws more debris onto the
+  ground.
+
 - **Corner radius** (`box_corner`, phase 15). 0 is the square box above; higher
   values round the corners, and **0.5 is a stadium** — the short ends become
   semicircles. It is a fraction of the box's **shorter side**, not a pixel count,
@@ -689,6 +709,7 @@ get variations of it, repeat until you like one.
   lock: [ ]shatter [ ]spacing [ ]seed [ ]tiling [x]colour [ ]zoom
   colour model: ( ) classic  (*) wada
   box corners:  (*) square ( ) soft ( ) round ( ) stadium
+  tiles:        (*) float ( ) clipped ( ) solid
   colours:      [ < ] [ > ]   [ roles ]
   [ Closer ]  small mutations around the selection
   [ Further ] large mutations around the selection
@@ -710,6 +731,13 @@ this control is the *only* way to explore the setting once the window is open.
 Children inherit the value unchanged, so choosing a corner and breeding keeps it for
 the whole row. A radius set from `--box-corner` that matches none of the four leaves
 every button unlit rather than lighting the nearest, which would misreport the cover.
+
+**The tiles row** picks between the three looks phase 17 opens: `float` lets the
+debris spill onto the ground as it always has, `clipped` cuts it at the box edge,
+and `solid` also overfills the box so the tiles reach its corners. Three names over
+two orthogonal fields — `clip_tiles` and `box_margin` stay separately settable from
+the CLI, and this is the shortcut rather than the model (decision 24). Like the other
+switches it converts the selection, so a row can hold all three side by side.
 
 **The colour dial** is the other way of finding a palette (phase 16). `Further`
 surprises you; the dial lets you *hunt*. `<` and `>` fill the variations row with the
@@ -1654,7 +1682,7 @@ round, and does nothing but say so on a classic cover; and **the rng state is
 byte-identical after stepping the dial and cycling roles**, with a second test that
 makes `random` raise while the dial runs.
 
-**Phase 17 — Solid box, hard cutoff.** *(proposed; difficulty: MEDIUM)*
+**Phase 17 — Solid box, hard cutoff.** *(done)*
 Today the shatter is fitted *inside* the box and the flung tiles spill over the edge
 to float on the plain ground — verified in phase 13 as 4 of 149 tiles at default
 knobs, and the look section 1 was written around. The ask is an alternative: fill the
@@ -1679,25 +1707,30 @@ intact core and the break-up has vanished entirely; the range where it still rea
 It should reuse phase 15's rounded corner in the mask, so the two compose — a rounded
 solid box was prototyped and works — which is the other reason to do 15 first.
 
-*Open — settle before code:*
+*All three settled before code, as decisions 24-26, and prototyping answered them
+more cleanly than this section proposed.* There is no mode: clipping is one boolean,
+the overfill is the existing `box_margin` going negative, and the default look is
+untouched for free because clipping is off unless asked for. The "cover-fit" this
+section imagined was never needed — `fit_to_box`'s own `1 - 2m` already scales the
+patch past the box once `m` may be negative.
 
-7. **One setting or two?** Clipping and cover-fit are separable — clipping alone is a
-   legible (if sparser) look — but they are only *useful* together. A single named
-   option is simpler to explain; two are more honest about what is happening.
-8. **What happens to `box_margin`?** In cover mode it is meaningless or inverted,
-   since the patch is deliberately larger than the box. It has a documented meaning in
-   section 8 that this would contradict, so the answer must be explicit: most likely
-   an `overfill` knob replaces it in this mode and section 8 says so.
-9. **Is this a mode or a widening of the default?** Recommended: a **named opt-in
-   mode**, exactly as decision 2 made Wada one. Section 1 describes the floating
-   debris as the aesthetic, and an opt-in mode keeps that true of the default while
-   opening the other look. The cost is a second composition aesthetic to maintain,
-   which is the same cost decision 2 accepted.
+*The trap that had to be handled* was not in the renderer. `box_margin` is bred,
+clamped to (0.05, 0.30), so a solid cover would have been dragged back to a floating
+one by its first mutation and silently lost the look. The drift range now depends on
+`clip_tiles`, which costs nothing in the mutation stream — `_drift` draws its
+gaussian either way and only the clamp moves — so no saved `--breed-seed` broke. That
+was checked against the stream goldens rather than reasoned about.
 
-*Check:* the default is byte-identical on all 27 goldens; with clipping on, no tile
-pixel falls outside the box — asserted against the mask, not by eye — including
-borders and overlap regions; a cover rendered at thumbnail and print size clips at
-the same relative place.
+*Check (passed):* all 30 pre-existing goldens byte-identical, so the default look did
+not move; with clipping on, **no pixel outside the box differs from the background**,
+asserted against the mask rather than by eye, and separately with a border and a real
+overlap region so that all three drawing passes are covered; the complementary test
+confirms tiles *do* escape when clipping is off, so the first cannot pass by the
+tiles never reaching the edge; the mask is asserted pixel-for-pixel against the box
+`draw_box` actually paints, including when rounded; a clipped cover keeps its
+overfill across 80 generations while an unclipped one never drifts negative; the
+mutation stream is unchanged; four new goldens, including clipping at the default
+margin as its own look and the busiest clipped path.
 
 
 ## 13. OPEN ITEMS / DECISIONS DEFERRED
@@ -1732,9 +1765,9 @@ the same relative place.
 - Whether a patch-rotation knob (rotating the whole tiling inside the box) is worth
   exposing; the old project always rotated, this one never does.
 
-The three proposed phases each carry open questions of their own. They are written
-where the work is, in **section 12.2**, rather than copied here — but they are listed
-so this section stays the place you can find out what is undecided:
+Section 12.2's three phases are now all built and their nine questions are all
+settled, as decisions 17-26. The list is kept struck through rather than deleted, so
+that what was asked and what was answered stay visible together:
 
 - ~~**Rounded corners (phase 15)**~~ — **both settled**, as decisions 17 and 18: a
   fraction of the box's shorter side capped at 0.5, and not a bred gene. Phase 15 is
@@ -1742,8 +1775,9 @@ so this section stays the place you can find out what is undecided:
 - ~~**The colour dial (phase 16)**~~ — **all four settled**, as decisions 20-23.
   Phase 16 is built. The ordering question was indeed load-bearing, and the answer
   changed under measurement; decision 21 records what killed the first version.
-- **Solid box (phase 17)** — one setting or two, what becomes of `box_margin`, and
-  whether it is an opt-in mode or a widening of the default. Three questions.
+- ~~**Solid box (phase 17)**~~ — **all three settled**, as decisions 24-26: two
+  orthogonal settings rather than a mode, `box_margin` gaining negative values, and
+  clipping neither bred nor hidden from the window. Phase 17 is built.
 
 
 ## 14. NICE TO HAVE — NOT BUILDING NOW

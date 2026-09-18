@@ -12,6 +12,7 @@ from shatter.render import (
     at_least,
     border_width_px,
     box_corner_px,
+    box_mask,
     box_rect,
     canvas_size,
     draw_box,
@@ -541,3 +542,105 @@ def test_the_corner_reaches_the_renderer_from_the_spec():
 
     assert CoverSpec(box_corner=0.3).render_params(10, 20).box_corner == 0.3
     assert CoverSpec().render_params(10, 20).box_corner == 0.0
+
+
+# --- Phase 17: clipping the tiles to the box ---------------------------------
+
+def rgb_pixels(image):
+    """Flat list of (r, g, b). Not `getdata`: Pillow 12 deprecates it, and the
+    replacement postdates this project's Pillow 10 floor."""
+    raw = image.convert("RGB").tobytes()
+    return [tuple(raw[i : i + 3]) for i in range(0, len(raw), 3)]
+
+
+def mask_pixels(mask):
+    return list(mask.tobytes())
+
+
+def clipped_params(**kwargs):
+    """A spec whose tiles certainly reach past the box, at scale 1 so that no
+    LANCZOS resampling can blur the edge the test is about."""
+    from shatter.spec import CoverSpec
+
+    spec = CoverSpec(
+        zoom=60, max_push=1.1, dropout=0.0, box_margin=-0.10, clip_tiles=True,
+        **kwargs,
+    )
+    return spec, spec.render_params(200, 300, supersample=1)
+
+
+@pytest.mark.parametrize("corner", [0.0, 0.25])
+def test_no_tile_pixel_escapes_the_box(corner):
+    """Phase 17's check, asserted against the mask rather than by eye -- and with
+    a rounded box too, where 'outside' includes the corner cut-outs."""
+    spec, params = clipped_params(box_corner=corner)
+    image = render_front(spec.build_layout(), params)
+    mask = box_mask(params, image.size)
+    background = resolve_palette(params).background
+
+    outside = [
+        pixel
+        for pixel, inside in zip(rgb_pixels(image), mask_pixels(mask))
+        if not inside
+    ]
+    assert outside, "the box covered the whole canvas; this proved nothing"
+    assert set(outside) == {background}
+
+
+def test_clipping_also_cuts_the_borders_and_the_overlaps():
+    """One mask at the end, not one per pass -- so every pass stops at the same
+    edge. Borders are drawn last and overlaps are a separate composite, so both
+    would escape a naive fill-only clip."""
+    spec, params = clipped_params(border="black", jitter=0.5, family="p2")
+    image = render_front(spec.build_layout(), params)
+    mask = box_mask(params, image.size)
+    background = resolve_palette(params).background
+
+    outside = {
+        pixel for pixel, inside in zip(rgb_pixels(image), mask_pixels(mask)) if not inside
+    }
+    assert outside == {background}
+
+
+def test_tiles_do_escape_when_clipping_is_off():
+    """The complement, so the test above cannot pass by the tiles never reaching
+    the edge in the first place."""
+    from shatter.spec import CoverSpec
+
+    spec = CoverSpec(zoom=60, max_push=1.1, dropout=0.0, box_margin=-0.10)
+    params = spec.render_params(200, 300, supersample=1)
+    image = render_front(spec.build_layout(), params)
+    mask = box_mask(params, image.size)
+    background = resolve_palette(params).background
+
+    outside = {
+        pixel for pixel, inside in zip(rgb_pixels(image), mask_pixels(mask)) if not inside
+    }
+    assert outside != {background}
+
+
+def test_the_mask_agrees_with_the_drawn_box():
+    """If these ever drifted apart, a clipped cover would cut somewhere other
+    than where its box is painted."""
+    params = RenderParams(width=200, height=300, box_corner=0.3)
+    painted = Image.new("RGB", (200, 300), (0, 0, 0))
+    draw_box(painted, params, (255, 255, 255))
+    mask = box_mask(params, (200, 300))
+
+    for pixel, inside in zip(rgb_pixels(painted), mask_pixels(mask)):
+        assert (pixel == (255, 255, 255)) == bool(inside)
+
+
+def test_a_negative_margin_scales_the_patch_past_the_box():
+    """Decision 25: the overfill is the existing arithmetic, not a new knob."""
+    patch, box = (0.0, 0.0, 1.0, 1.0), (0.0, 0.0, 100.0, 100.0)
+    inside = fit_to_box(patch, box, 0.15)((1.0, 0.0))[0]
+    outside = fit_to_box(patch, box, -0.15)((1.0, 0.0))[0]
+    assert outside > inside > 50.0
+
+
+def test_clipping_reaches_the_renderer_from_the_spec():
+    from shatter.spec import CoverSpec
+
+    assert CoverSpec(clip_tiles=True).render_params(10, 20).clip_tiles is True
+    assert CoverSpec().render_params(10, 20).clip_tiles is False

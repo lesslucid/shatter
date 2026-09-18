@@ -638,3 +638,37 @@ def test_an_additive_non_bred_field_does_not_disturb_the_stream_guard():
     assert _spec_digest(plain) == _spec_digest(rounded)
     assert all(child.box_corner == 0.3
                for child in generation(rounded, 20, FURTHER, random.Random(1)))
+
+
+def test_a_clipped_cover_keeps_its_overfill_while_breeding():
+    """Decision 25's trap. `KNOB_RANGES` stops box_margin at 0.05, which would
+    have dragged a solid cover back to a floating one on its first mutation."""
+    from shatter.breed import CLIPPED_BOX_MARGIN_FLOOR
+
+    spec = CoverSpec(clip_tiles=True, box_margin=-0.10)
+    rng = random.Random(4)
+    negatives = 0
+    for _ in range(80):
+        spec = mutate(spec, FURTHER, rng)
+        assert CLIPPED_BOX_MARGIN_FLOOR <= spec.box_margin <= KNOB_RANGES["box_margin"][1]
+        assert spec.clip_tiles is True
+        negatives += spec.box_margin < 0
+    assert negatives > 20, "the overfill drifted away and never came back"
+
+
+def test_an_unclipped_cover_never_drifts_into_overfill():
+    """The complement: widening the clamp must not change the default look."""
+    spec = CoverSpec()
+    rng = random.Random(4)
+    for _ in range(200):
+        spec = mutate(spec, FURTHER, rng)
+        low, high = KNOB_RANGES["box_margin"]
+        assert low <= spec.box_margin <= high
+
+
+def test_clipping_is_not_a_bred_gene():
+    """Decision 26, and the reason the chooser needs a control for it."""
+    assert not any("clip_tiles" in gene.fields for gene in GENES)
+    for base in (CoverSpec(), CoverSpec(clip_tiles=True)):
+        for child in generation(base, 200, FURTHER, random.Random(2)):
+            assert child.clip_tiles == base.clip_tiles
