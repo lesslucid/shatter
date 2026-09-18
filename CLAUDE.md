@@ -27,12 +27,19 @@ revisited rather than re-argued.** Several were *corrected by measurement* while
 being implemented; the corrections are written up where the original claim was,
 so re-deriving them from scratch will waste your time.
 
-## Status: finished
+## Status
 
-**Phases 0–14 are all built, and nothing is in progress.** 322 tests pass, with a
-27-image golden suite. The last commit is a clean, working state. If you are here,
-it is almost certainly to change something by choice rather than to finish
-something that was left half-done.
+**Phases 0–14 are all built and nothing is half-done.** 322 tests pass, with a
+27-image golden suite, and the last commit is a clean working state.
+
+**Phases 15–17 are proposed and not started** — rounded feature-box corners, a
+colour dial, and a solid box that clips the tiles at its edge. They are written up
+in design doc **§12.2**, with difficulty ratings and figures that were *measured by
+prototyping*, not estimated. **Each carries open design questions that are
+deliberately unanswered** — nine in total, listed in §12.2 and indexed from §13.
+Settle them with the user before writing code; in all three cases the question is
+the interesting part of the work, and in phase 16 the obvious implementation is the
+wrong one.
 
 ## Working agreement with this user
 
@@ -161,6 +168,9 @@ None of this is unfinished work — each was considered and left alone on purpos
   would mean two incompatible aesthetics and `lock colour` would become ambiguous.
 - **§13 open items** — box-aware vs radial shatter, a patch-rotation knob.
 - **§14** — the interactive editor, and everything else consciously excluded.
+
+Distinct from those: **phases 15–17 in §12.2 are wanted but unstarted**, not
+declined. See Status above.
 
 ## Gotchas that have already cost time
 

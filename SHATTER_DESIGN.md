@@ -28,6 +28,11 @@ everything but `colour`, press Further, and climb back out of a dark ground.
 the sixteen decisions they were agreed against**, which is the part to read first
 if you are picking this up cold.
 
+**Phases 15–17 are proposed and not started** — rounded feature-box corners, a
+colour dial for hunting through the palette space, and a solid box that clips the
+tiles at its edge. Section 12.2 has all three, with the nine design questions they
+raise recorded as open rather than answered.
+
 **Working name:** `shatter` — the package name and the CLI command. (The repo
 folder on disk is `shattered/`; only the *package* name matters to the code, so
 the two need not match. If you rename the package, change it everywhere in
@@ -1385,6 +1390,135 @@ Agreed before implementation, recorded so they can be revisited rather than re-a
 
 **Suggested order:** 9 → 10 → (11 and 12, in either order) → 13 → 14. Phases 11 and 12 are
 independent of each other once 10 lands, so either can go first or they can be split.
+*(All of these are built. Phases 15–17, proposed and not started, are in section 12.2,
+and the decisions they still need are open questions there rather than entries here.)*
+
+
+### 12.2 PROPOSED PHASES 15–17
+
+Three features asked for after phase 14 landed. **All three are proposed, none is
+started, and each carries at least one design question that must be settled before
+any code** — the working agreement in CLAUDE.md, which has caught a real error every
+time it has been applied. The difficulty ratings and the numbers below come from
+prototyping each one, not from estimating.
+
+The suggested order is **15 → 16 → 17**: 15 is a quick win that lays groundwork 17
+reuses, 16 has the best value-for-risk (it touches no random draws at all), and 17
+is the largest.
+
+**Phase 15 — Rounded feature-box corners.** *(proposed; difficulty: LOW)*
+The feature box is drawn with sharp corners by a single `ImageDraw.rectangle` call in
+`render_front`. Pillow ships `rounded_rectangle` with the same signature plus a
+`radius`, so the drawing change is one line. Add a `box_corner` field to `CoverSpec`,
+default 0 (square), and a `--box-corner` flag.
+
+Prototyped across radii from square to a full lozenge: the look holds up at every
+value, and a large radius on a narrow box degenerates gracefully into a stadium
+rather than into anything broken.
+
+*Open — settle before code:*
+
+1. **The radius must be a fraction, not pixels — of what?** Pixels cannot work: a
+   20px radius on a 200px-wide thumbnail and on a 3000px print are different shapes,
+   so a chooser thumbnail would stop predicting the print. Every other spatial knob
+   in section 8 is a fraction (`tile_gap`, `box_margin`, the three margins), so this
+   should be one too. The open part is the *reference*: the box's shorter side is the
+   obvious candidate, and it makes 0.5 exactly a stadium end.
+2. **Is it a bred gene?** Recommended **no**, at least at first. Adding a gene adds a
+   draw and breaks every saved `--breed-seed` again — decision 14 is explicit about
+   not doing that casually. There is clean precedent for a setting that is not bred:
+   `border_width`, `title_band`, `side_margin` and `bottom_margin` are all exactly
+   this. It can be promoted to a gene later, at the cost of one more stream break.
+
+*Check:* a default of 0 leaves all 27 goldens byte-identical, since the field is
+additive and the drawing call is unchanged at radius 0; the radius survives a change
+of output size, i.e. a thumbnail and a full-size render describe the same shape.
+
+**Phase 16 — The colour dial.** *(proposed; difficulty: MEDIUM)*
+`Further` finds new palettes by surprise, which is the point of it, but there is no
+way to *hunt*. The ask is a control that walks the colour space for the current
+tiling in order — show five, click forward for the next five — so a half-remembered
+scheme can be found again.
+
+The enumeration is nearly free: `offered(layout)` is already a deterministic ordered
+tuple, so "the next five" is a slice, and `PALETTES` is the classic-mode equivalent.
+**It consumes no random draws at all**, so unlike almost everything in phases 9–14 it
+cannot shift the mutation stream or break a saved breed seed. That is most of why it
+is recommended before phase 17.
+
+*The ordering is the whole design problem, and the natural one is unusable.*
+`offered()` is ordered combination-major with every permutation adjacent, so a naive
+"next five" shows **the same three colours rearranged five times** rather than five
+different colour groups — the first page of `box` is six permutations of combination
+121. Prototyped side by side, the difference is not subtle.
+
+*Open — settle before code:*
+
+3. **What does one step of the dial change?** Recommended: one *combination*, at a
+   single representative permutation, so every entry on a page is a genuinely
+   different colour group. That also shrinks `box` from 127 pages to 22.
+4. **In what order?** Recommended: **by hue**, so the dial sweeps reds → oranges →
+   yellows → greens → blues → purples and can be searched the way a colour wheel can.
+   Combination id is stable but arbitrary, which is exactly the wrong property for
+   hunting. Open: hue *of which role* — the background is the largest area and the
+   obvious answer.
+5. **Where does the permutation go?** If the dial steps combinations only, the role
+   assignment needs either a second control or to stay with breeding (decision 10),
+   which already moves it by single swaps at a measured rate.
+6. **Where does the page state live, and when does it reset?** The chooser has two
+   rows with a meaning (`chosen from` / `variations`); a colour page fills the second
+   without breeding. Whether selecting a different cover resets the page is a real
+   choice and should be made deliberately.
+
+*Check:* stepping the dial changes only colour — every other field of the spec is
+untouched; a full sweep visits every assignment the mode offers exactly once and
+returns to where it started; no call into `breed.py` and no rng consumed, asserted
+rather than assumed.
+
+**Phase 17 — Solid box, hard cutoff.** *(proposed; difficulty: MEDIUM)*
+Today the shatter is fitted *inside* the box and the flung tiles spill over the edge
+to float on the plain ground — verified in phase 13 as 4 of 149 tiles at default
+knobs, and the look section 1 was written around. The ask is an alternative: fill the
+box with tiles and cut them dead at its edge, showing nothing outside.
+
+This is **two coupled changes**, which is what makes it the largest of the three:
+
+- **Clipping** every tile to the box — and not only the fills. Borders and the
+  overlap composite have to go through the same mask, which means drawing the tiles
+  onto their own layer and compositing it through a box-shaped mask rather than
+  painting straight onto the canvas.
+- **Cover-fit** — scaling the patch to *overfill* the box rather than fit inside it.
+  Without this, clipping alone gives a box with empty corners where the debris used
+  to be, because the fit is computed from the unedited patch and the shatter then
+  moves tiles out of it.
+
+Prototyped, and there is a real tension worth recording: **the more you overfill, the
+less shatter you can see.** At an overfill of about 1.45 the visible area is all
+intact core and the break-up has vanished entirely; the range where it still reads as
+*shattered but solid* is roughly **1.0 to 1.2**.
+
+It should reuse phase 15's rounded corner in the mask, so the two compose — a rounded
+solid box was prototyped and works — which is the other reason to do 15 first.
+
+*Open — settle before code:*
+
+7. **One setting or two?** Clipping and cover-fit are separable — clipping alone is a
+   legible (if sparser) look — but they are only *useful* together. A single named
+   option is simpler to explain; two are more honest about what is happening.
+8. **What happens to `box_margin`?** In cover mode it is meaningless or inverted,
+   since the patch is deliberately larger than the box. It has a documented meaning in
+   section 8 that this would contradict, so the answer must be explicit: most likely
+   an `overfill` knob replaces it in this mode and section 8 says so.
+9. **Is this a mode or a widening of the default?** Recommended: a **named opt-in
+   mode**, exactly as decision 2 made Wada one. Section 1 describes the floating
+   debris as the aesthetic, and an opt-in mode keeps that true of the default while
+   opening the other look. The cost is a second composition aesthetic to maintain,
+   which is the same cost decision 2 accepted.
+
+*Check:* the default is byte-identical on all 27 goldens; with clipping on, no tile
+pixel falls outside the box — asserted against the mask, not by eye — including
+borders and overlap regions; a cover rendered at thumbnail and print size clips at
+the same relative place.
 
 
 ## 13. OPEN ITEMS / DECISIONS DEFERRED
@@ -1418,6 +1552,18 @@ independent of each other once 10 lands, so either can go first or they can be s
   Lab recomputed from `rgb`.** Section 12.1, decisions 11 and 13.
 - Whether a patch-rotation knob (rotating the whole tiling inside the box) is worth
   exposing; the old project always rotated, this one never does.
+
+The three proposed phases each carry open questions of their own. They are written
+where the work is, in **section 12.2**, rather than copied here — but they are listed
+so this section stays the place you can find out what is undecided:
+
+- **Rounded corners (phase 15)** — what the radius is a fraction *of*, and whether it
+  becomes a bred gene at the cost of another mutation-stream break. Two questions.
+- **The colour dial (phase 16)** — what one step changes, in what order, where the
+  role permutation goes, and where the page state lives. Four questions, and the
+  ordering one is load-bearing: the natural order is unusable for the purpose.
+- **Solid box (phase 17)** — one setting or two, what becomes of `box_margin`, and
+  whether it is an opt-in mode or a widening of the default. Three questions.
 
 
 ## 14. NICE TO HAVE — NOT BUILDING NOW
