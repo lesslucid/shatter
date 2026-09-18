@@ -687,6 +687,7 @@ get variations of it, repeat until you like one.
   click a cover to select it
   lock: [ ]shatter [ ]spacing [ ]seed [ ]tiling [x]colour [ ]zoom
   colour model: ( ) classic  (*) wada
+  box corners:  (*) square ( ) soft ( ) round ( ) stadium
   [ Closer ]  small mutations around the selection
   [ Further ] large mutations around the selection
   [ Print! ]  render the selection full size
@@ -699,6 +700,14 @@ neighbours alone — which means a row can hold the same shatter in both models
 side by side. Switching is free in either direction: each model reads only its own
 fields (decision 15), so a classic cover's settings survive a trip through `wada`
 untouched. It is **not** a gene — see decision 5.
+
+**The box corners** work the same way and for a sharper reason (phase 15). Four named
+radii — square, soft, round, stadium — again applied to the selection. Because
+`box_corner` is deliberately not a gene (decision 18), `Further` never moves it, so
+this control is the *only* way to explore the setting once the window is open.
+Children inherit the value unchanged, so choosing a corner and breeding keeps it for
+the whole row. A radius set from `--box-corner` that matches none of the four leaves
+every button unlit rather than lighting the nearest, which would misreport the cover.
 
 **Locking** (phase 9) holds a gene still while everything else keeps rolling — tick
 `colour` to hunt for an arrangement without the palette wandering, tick `tiling` and
@@ -1418,6 +1427,15 @@ Agreed before implementation, recorded so they can be revisited rather than re-a
     choosing, at the cost of one more stream break, and nothing about the field
     would have to change.
 
+    **The consequence, which was not thought through when this was settled:** if
+    breeding never moves it, the only way to explore it interactively is a
+    control. The chooser therefore grew one (section 11.2). That does not
+    weaken the decision — it is the same division of labour as decision 5, where
+    the user crosses between colour models by hand and `Further` never does —
+    but a setting that is neither bred nor exposed in the window would have been
+    reachable only by relaunching, which is the gap this pair of decisions would
+    otherwise have left.
+
 19. **The mutation-stream digest covers the mutable fields, not the whole spec.**
     *(phase 15, from a false positive.)* As first written it hashed all of
     `to_dict()`, so adding `box_corner` — a field no gene owns, that every child
@@ -1480,7 +1498,9 @@ output size (30px at 150 wide, 120px at 600) and to supersampling; values of 0.5
 0.6, 1.0 and 4.0 all clamp to the stadium; a negative radius renders square; a
 config written before phase 15 still loads and renders square; three new goldens,
 including the stadium extreme and a rounded box sharing a cover with a Wada palette
-and tile borders.
+and tile borders. In the chooser: the radio reports the selection rather than the
+window, converts only the selected cover, leaves every button unlit for a CLI-set
+radius matching no preset, and children inherit the chosen corner through a breed.
 
 **Phase 16 — The colour dial.** *(proposed; difficulty: MEDIUM)*
 `Further` finds new palettes by surprise, which is the point of it, but there is no

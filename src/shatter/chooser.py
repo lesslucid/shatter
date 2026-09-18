@@ -36,6 +36,26 @@ EMPTY_FILL = (232, 232, 232)
 
 ROW_LABELS = ("chosen from", "variations")
 
+#: Named feature-box corner radii for the window (phase 15). The spec field is
+#: continuous and `--box-corner` takes any value in [0, 0.5]; these are the four
+#: worth a click. They live here rather than in `render.py` because they are a
+#: convenience of this window, not part of the colour or drawing model -- nothing
+#: outside the chooser has any reason to know the names.
+CORNER_PRESETS = {"square": 0.0, "soft": 0.08, "round": 0.2, "stadium": 0.5}
+
+
+def corner_preset_name(value: float) -> str:
+    """The preset a radius matches, or "" for a value only the CLI can set.
+
+    An empty string leaves every radio button unlit, which is the honest way to
+    show `--box-corner 0.22`: the cover really is not any of the four, and
+    lighting the nearest would misreport it.
+    """
+    for name, preset in CORNER_PRESETS.items():
+        if preset == value:
+            return name
+    return ""
+
 def inert_message(radius_name: str, locked: frozenset[str]) -> str:
     """Why a button did nothing, and what to unticking would fix it.
 
@@ -69,6 +89,12 @@ class Chooser:
             for gene in GENES
         }
         self.mode_var = tk.StringVar(master=root, value=base.mode)
+        # Preset *names*, not floats: tk variables round-trip through Tcl as
+        # strings, and comparing 0.08 that way is a good way to have a radio
+        # silently fail to light.
+        self.corner_var = tk.StringVar(
+            master=root, value=corner_preset_name(base.box_corner)
+        )
         self.rows: list[list[CoverSpec]] = [random_seeds(base, COLUMNS, rng), []]
         self.selected: tuple[int, int] | None = None
         self.photos: dict[tuple[int, int], ImageTk.PhotoImage] = {}
@@ -128,6 +154,18 @@ class Chooser:
                 command=self.switch_mode,
             ).pack(side="left")
 
+        corners = tk.Frame(self.root)
+        corners.pack(pady=(4, 0))
+        tk.Label(corners, text="box corners:", fg="#666").pack(side="left", padx=(0, 4))
+        for name in CORNER_PRESETS:
+            tk.Radiobutton(
+                corners,
+                text=name,
+                value=name,
+                variable=self.corner_var,
+                command=self.switch_corner,
+            ).pack(side="left")
+
         controls = tk.Frame(self.root)
         controls.pack(pady=10)
         tk.Button(
@@ -185,6 +223,7 @@ class Chooser:
         # setting. Setting the variable does not fire the widget's command --
         # tkinter only does that on a click -- so this cannot convert anything.
         self.mode_var.set(spec.mode)
+        self.corner_var.set(corner_preset_name(spec.box_corner))
         self.refresh()
 
     def switch_mode(self) -> None:
@@ -215,6 +254,34 @@ class Chooser:
             f"{wanted}: {describe_colour(self.rows[row][column])}. "
             "Closer or Further to explore it."
         )
+
+    def switch_corner(self) -> None:
+        """Set the selected cover's feature-box corner radius.
+
+        The same semantics as `switch_mode`: it converts the selection rather
+        than the window, so a row can hold a square cover beside a rounded one
+        and the two can be compared directly.
+
+        This control is the *only* way to explore the setting once the window is
+        open. `box_corner` is deliberately not a gene (section 12.1, decision
+        18), so `Further` never moves it -- which is exactly why it needs a
+        control. Children do inherit it unchanged, so choosing a corner here and
+        breeding keeps it for the whole row.
+        """
+        spec = self.selected_spec()
+        wanted = self.corner_var.get()
+        if spec is None:
+            self.say("Pick a cover first, then choose its corners.")
+            return
+        if not wanted:
+            return  # a CLI-set radius that matches no preset; nothing to apply
+        radius = CORNER_PRESETS[wanted]
+        if spec.box_corner == radius:
+            return
+
+        row, column = self.selected
+        self.rows[row][column] = spec.with_changes(box_corner=radius)
+        self.refresh(f"box corners: {wanted} ({radius:g}).")
 
     def breed(self, radius_name: str) -> None:
         parent = self.selected_spec()

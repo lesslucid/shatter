@@ -29,7 +29,7 @@ so re-deriving them from scratch will waste your time.
 
 ## Status
 
-**Phases 0–15 are all built and nothing is half-done.** 346 tests pass, with a
+**Phases 0–15 are all built and nothing is half-done.** 354 tests pass, with a
 30-image golden suite, and the last commit is a clean working state.
 
 **Phases 16 and 17 are proposed and not started** — a colour dial for hunting the
@@ -71,7 +71,7 @@ pick.
 ## Getting oriented
 
 ```bash
-.venv/bin/python -m pytest -q                        # 346 tests, ~9s
+.venv/bin/python -m pytest -q                        # 354 tests, ~10s
 .venv/bin/shatter --help                             # or python -m shatter.cli
 
 # see something, in each colour model

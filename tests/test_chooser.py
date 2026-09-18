@@ -10,7 +10,12 @@ import pytest
 tk = pytest.importorskip("tkinter")
 
 from shatter.breed import GENES  # noqa: E402
-from shatter.chooser import COLUMNS, Chooser  # noqa: E402
+from shatter.chooser import (  # noqa: E402
+    COLUMNS,
+    CORNER_PRESETS,
+    Chooser,
+    corner_preset_name,
+)
 from shatter.spec import CoverSpec  # noqa: E402
 
 
@@ -258,3 +263,74 @@ def test_breeding_after_a_switch_stays_in_the_new_mode(chooser):
 
     assert chooser.rows[1]
     assert all(child.mode == "wada" for child in chooser.rows[1])
+
+
+# --- the feature-box corner control ------------------------------------------
+
+
+def test_the_corner_radio_starts_on_the_launched_value(root, tmp_path):
+    window = Chooser(root, CoverSpec(zoom=60, box_corner=0.2), tmp_path, random.Random(1))
+    assert window.corner_var.get() == "round"
+
+
+def test_a_cli_set_radius_that_matches_no_preset_lights_nothing(root, tmp_path):
+    """`--box-corner 0.22` is legal and is not one of the four. Lighting the
+    nearest preset would misreport the cover; an empty string lights none."""
+    window = Chooser(root, CoverSpec(zoom=60, box_corner=0.22), tmp_path, random.Random(1))
+    assert window.corner_var.get() == ""
+    assert all(spec.box_corner == 0.22 for spec in window.rows[0])
+
+
+def test_switching_corners_converts_only_the_selected_cover(chooser):
+    chooser.select(0, 2)
+    chooser.corner_var.set("stadium")
+    chooser.switch_corner()
+
+    assert chooser.rows[0][2].box_corner == 0.5
+    assert [spec.box_corner for spec in chooser.rows[0]] == [0.0, 0.0, 0.5, 0.0, 0.0]
+
+
+def test_switching_corners_without_a_selection_converts_nothing(chooser):
+    chooser.corner_var.set("round")
+    chooser.switch_corner()
+    assert all(spec.box_corner == 0.0 for spec in chooser.rows[0])
+    assert "Pick a cover" in chooser.status.cget("text")
+
+
+def test_the_corner_radio_follows_the_selection(chooser):
+    chooser.select(0, 0)
+    chooser.corner_var.set("soft")
+    chooser.switch_corner()
+    assert chooser.corner_var.get() == "soft"
+
+    chooser.select(0, 1)
+    assert chooser.corner_var.get() == "square"
+
+
+def test_children_inherit_the_chosen_corner(chooser):
+    """`box_corner` is not a gene (decision 18), so breeding must carry it
+    through untouched -- which is what makes choosing one here worth doing."""
+    chooser.select(0, 0)
+    chooser.corner_var.set("round")
+    chooser.switch_corner()
+    chooser.breed("further")
+
+    assert chooser.rows[1]
+    assert all(child.box_corner == 0.2 for child in chooser.rows[1])
+
+
+def test_the_corner_and_colour_controls_are_independent(chooser):
+    chooser.select(0, 0)
+    chooser.corner_var.set("stadium")
+    chooser.switch_corner()
+    chooser.mode_var.set("wada")
+    chooser.switch_mode()
+
+    spec = chooser.rows[0][0]
+    assert spec.box_corner == 0.5 and spec.mode == "wada"
+
+
+def test_corner_preset_names_round_trip():
+    for name, value in CORNER_PRESETS.items():
+        assert corner_preset_name(value) == name
+    assert corner_preset_name(0.22) == ""
