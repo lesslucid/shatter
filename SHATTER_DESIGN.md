@@ -1208,7 +1208,7 @@ of combination in over half the cases where the layout holds. `--mode wada --loc
 shatter,spacing,seed,tiling,zoom` produces ten visibly different palettes in one sheet.
 
 
-### 12.1 DECISIONS BEHIND PHASES 9–17
+### 12.1 DECISIONS BEHIND PHASES 9–18
 
 Agreed before implementation, recorded so they can be revisited rather than re-argued.
 
@@ -1583,6 +1583,48 @@ Agreed before implementation, recorded so they can be revisited rather than re-a
     place it can be explored — the pairing that decision 18 failed to anticipate
     for corners and that is applied here from the start rather than after being
     asked for.
+
+27. **Grid lines take the background colour, stepping away from it when the box
+    already is the background.** *(phase 18.)* The background is the point: the
+    box reads as cut into strips with the ground showing through, the same logic
+    the tile gaps already use, and it stays subtle enough not to fight the
+    medallion. Black was prototyped and overwhelms the cover.
+
+    Where `box_color="bg"` or the Wada `shapes` layout makes the box *be* the
+    background — **33% of classic covers and 20% of Wada ones**, measured — there
+    is nothing beneath to show through, so the lines step away from the
+    background instead of matching it.
+
+    **The step is lightness-aware, and that is not decoration.** An earlier
+    version simply darkened, which was measured invisible on dark grounds: the
+    darkest `shapes` background moves **0.81 dE** under a 0.88 darken, against a
+    just-noticeable difference of about 2.3. Blending toward black or white
+    according to the background's own lightness gives a **minimum of 5.3 dE and a
+    median of 7.6** across every ground either mode offers, at a blend of 0.10-0.12
+    — visible everywhere, shouting nowhere. Decision 8's dark backgrounds are
+    exactly the case that broke the simpler rule.
+
+28. **The grid fills the box; the cells stretch with it.** *(phase 18.)* A sudoku
+    grid has square cells and the feature box usually does not, so something has
+    to give. Filling keeps the grid aligned to all four box edges, which is what
+    makes it read as part of the box rather than an object placed on it; on a
+    near-square box the stretch is invisible, and on a tall one it is still
+    plainly a grid. Square cells centred in the box were the alternative, and
+    leave a margin on the longer axis that looks like a mistake rather than a
+    choice.
+
+29. **One switch, fixed at 9x9, weights as constants.** *(phase 18.)* The grid is
+    a single boolean. The divisions are 9 with heavier lines on multiples of 3,
+    because that is what makes it read as *sudoku* rather than graph paper, and
+    because it is not obvious what 4x4 would buy a cover. The two line weights are
+    fractions of the box's shorter side per decision 17, and live as tuned
+    constants rather than spec fields — this is a look, not a parameter, and the
+    phase stays small by keeping it that way. Generalising the divisions later
+    costs one constant and one modulo.
+
+    Not bred, and given a chooser control, following decisions 18 and 26: breeding
+    it would break every saved `--breed-seed` again, and a setting that is neither
+    bred nor in the window cannot be explored at all.
 
 **Suggested order:** 9 → 10 → (11 and 12, in either order) → 13 → 14. Phases 11 and 12 are
 independent of each other once 10 lands, so either can go first or they can be split.
