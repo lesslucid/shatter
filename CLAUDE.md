@@ -41,10 +41,18 @@ so re-deriving them from scratch will waste your time.
 **Phases 0–17 are all built and nothing is half-done.** 414 tests pass, with a
 34-image golden suite, and the last commit is a clean working state.
 
-There is no next phase. Design doc §12.2's three later features (rounded corners, the
-colour dial, the solid box) are done, and their nine design questions are settled as
-§12.1 decisions 17–26. What remains is in **§13 (open items)** and **§14 (not
-building now)**, plus the short list below — none of it committed work.
+**Phase 18 (sudoku grid lines) is proposed and not started** — a 9x9 grid drawn
+inside the feature box, behind the tiles, in the background colour so the ground
+shows through. Written up in §12.2 with four open design questions, prototyped
+rather than estimated. The first question is load-bearing: the background-colour
+idea that makes the feature worth doing is measured to show *nothing at all* on
+33% of classic and 20% of Wada covers, because the box is already the background
+in those. Settle that with the user before writing code.
+
+Everything else in §12.2 is done (rounded corners, the colour dial, the solid box),
+its nine questions settled as §12.1 decisions 17–26. What else remains is in
+**§13 (open items)** and **§14 (not building now)**, plus the short list below —
+none of it committed work.
 
 ## Working agreement with this user
 
