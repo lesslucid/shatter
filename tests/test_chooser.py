@@ -497,3 +497,45 @@ def test_switching_tiles_without_a_selection_converts_nothing(chooser):
     chooser.switch_fit()
     assert all(spec.clip_tiles is False for spec in chooser.rows[0])
     assert "Pick a cover" in chooser.status.cget("text")
+
+
+# --- the grid checkbox --------------------------------------------------------
+
+
+def test_the_grid_checkbox_starts_on_the_launched_value(root, tmp_path):
+    window = Chooser(root, CoverSpec(zoom=60, grid_lines=True), tmp_path, random.Random(1))
+    assert window.grid_var.get() is True
+
+
+def test_ticking_the_grid_converts_only_the_selected_cover(chooser):
+    chooser.select(0, 1)
+    chooser.grid_var.set(True)
+    chooser.switch_grid()
+    assert [spec.grid_lines for spec in chooser.rows[0]] == [
+        False, True, False, False, False
+    ]
+
+
+def test_the_grid_checkbox_follows_the_selection(chooser):
+    chooser.select(0, 0)
+    chooser.grid_var.set(True)
+    chooser.switch_grid()
+    chooser.select(0, 1)
+    assert chooser.grid_var.get() is False
+
+
+def test_ticking_the_grid_without_a_selection_converts_nothing(chooser):
+    chooser.grid_var.set(True)
+    chooser.switch_grid()
+    assert all(spec.grid_lines is False for spec in chooser.rows[0])
+    assert "Pick a cover" in chooser.status.cget("text")
+    assert chooser.grid_var.get() is False, "the box should not stay ticked"
+
+
+def test_the_grid_warns_when_solid_tiles_would_hide_it(chooser):
+    chooser.select(0, 0)
+    chooser.fit_var.set("solid")
+    chooser.switch_fit()
+    chooser.grid_var.set(True)
+    chooser.switch_grid()
+    assert "invisible" in chooser.status.cget("text").lower()

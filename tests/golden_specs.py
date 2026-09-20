@@ -112,6 +112,14 @@ GOLDEN_SPECS: dict[str, CoverSpec] = {
         zoom=60, family="p2", clip_tiles=True, box_margin=-0.05,
         border="black", tile_color="dark", jitter=0.45,
     ),
+    # Phase 18. Both branches of the grid colour rule, because they are different
+    # code paths and the fallback is the one that is easy to get wrong -- plus a
+    # rounded box, where the grid has to be cut on the curve.
+    "grid_classic": CoverSpec(zoom=60, grid_lines=True),
+    "grid_invisible_box": CoverSpec(zoom=60, grid_lines=True, box_color="bg"),
+    "grid_wada_rounded": CoverSpec(
+        zoom=60, mode="wada", wada_combination=126, grid_lines=True, box_corner=0.25,
+    ),
 }
 
 

@@ -56,6 +56,8 @@ class CoverSpec:
     # Cut the tiles off at the box edge instead of letting them spill onto the
     # ground (phase 17). Not a bred gene -- section 12.1, decision 26.
     clip_tiles: bool = False
+    # A sudoku grid behind the tiles (phase 18). Not bred -- decision 29.
+    grid_lines: bool = False
     title_band: float = 0.30
     side_margin: float = 0.10
     bottom_margin: float = 0.10
@@ -117,6 +119,7 @@ class CoverSpec:
             box_margin=self.box_margin,
             box_corner=self.box_corner,
             clip_tiles=self.clip_tiles,
+            grid_lines=self.grid_lines,
             title_band=self.title_band,
             side_margin=self.side_margin,
             bottom_margin=self.bottom_margin,

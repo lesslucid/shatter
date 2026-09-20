@@ -28,12 +28,12 @@ everything but `colour`, press Further, and climb back out of a dark ground.
 the sixteen decisions they were agreed against**, which is the part to read first
 if you are picking this up cold.
 
-**Phases 15, 16 and 17 are built**, and **phase 18 (sudoku grid lines) is proposed
-and not started** — see section 12.2. The three that are built:
-`--box-corner` for rounded feature-box corners; a colour dial in the chooser that
-walks the palette space in hue order so a half-remembered scheme can be hunted
-rather than waited for; and `--clip-tiles` with a negative `box_margin` for a solid
-box whose tiles stop dead at its edge.
+**Phases 15 to 18 are built** — see section 12.2: `--box-corner` for rounded
+feature-box corners; a colour dial in the chooser that walks the palette space in
+hue order so a half-remembered scheme can be hunted rather than waited for;
+`--clip-tiles` with a negative `box_margin` for a solid box whose tiles stop dead at
+its edge; and `--grid-lines` for a 9x9 sudoku grid drawn behind the tiles, in the
+background colour so the ground shows through.
 
 **Working name:** `shatter` — the package name and the CLI command. (The repo
 folder on disk is `shattered/`; only the *package* name matters to the code, so
@@ -405,6 +405,24 @@ core size per family, so per-family default overrides may eventually be worth it
   the box's shape and the family's patch aspect; past about **-0.25** the intact
   core fills the frame and the shatter stops being visible at all.
 
+- **Sudoku grid lines** (`grid_lines`, phase 18). Off by default. A 9x9 grid
+  drawn inside the box and **behind the tiles**, with heavier lines on the 3rd and
+  6th divisions — that weighting is what makes it read as *sudoku* rather than
+  graph paper. The grid fills the box, so its cells take the box's aspect
+  (decision 28), and it is masked to the box so it is cut on a rounded corner
+  rather than poking through it.
+
+  The lines are painted in the **background** colour, so the box reads as cut into
+  strips with the ground showing through — the same logic the tile gaps already
+  use, and subtle enough not to compete with the medallion. Where the box *is* the
+  background (`box_color="bg"`, or the Wada `shapes` layout) there is nothing
+  beneath to show through, so the lines step away from the background instead,
+  toward black or white according to its lightness. See decision 27, and note that
+  the simpler "just darken it" rule was measured invisible on dark grounds.
+
+  It is invisible under a solid box (phase 17), where the tiles cover everything.
+  That is expected rather than broken.
+
 - **Clipping** (`clip_tiles`, phase 17). Off by default, which is the whole of
   section 1's look: the tiles spill past the box and float on the plain ground.
   On, they are cut dead at the box edge and nothing shows outside it. The tiles
@@ -710,7 +728,7 @@ get variations of it, repeat until you like one.
   lock: [ ]shatter [ ]spacing [ ]seed [ ]tiling [x]colour [ ]zoom
   colour model: ( ) classic  (*) wada
   box corners:  (*) square ( ) soft ( ) round ( ) stadium
-  tiles:        (*) float ( ) clipped ( ) solid
+  tiles:        (*) float ( ) clipped ( ) solid   [ ] grid
   colours:      [ < ] [ > ]   [ roles ]
   [ Closer ]  small mutations around the selection
   [ Further ] large mutations around the selection
@@ -739,6 +757,11 @@ and `solid` also overfills the box so the tiles reach its corners. Three names o
 two orthogonal fields — `clip_tiles` and `box_margin` stay separately settable from
 the CLI, and this is the shortcut rather than the model (decision 24). Like the other
 switches it converts the selection, so a row can hold all three side by side.
+
+**The grid checkbox** turns phase 18's sudoku grid on for the selected cover. Like
+the corner and tile controls it exists because the setting is deliberately not bred
+(decision 29), so the window is the only place it can be reached. It says so when
+the cover is solid, where the tiles hide the grid entirely.
 
 **The colour dial** is the other way of finding a palette (phase 16). `Further`
 surprises you; the dial lets you *hunt*. `<` and `>` fill the variations row with the
@@ -1634,8 +1657,7 @@ and the decisions they still need are open questions there rather than entries h
 
 ### 12.2 PHASES 15 ONWARD
 
-Features asked for after phase 14 landed. **15, 16 and 17 are built**; **18 is
-proposed and not started.** Each arrived with at least one design question that had
+Features asked for after phase 14 landed. **All four are built.** Each arrived with at least one design question that had
 to be settled before any code — the working agreement in CLAUDE.md, which has caught
 a real error every time it has been applied. The difficulty ratings and the numbers
 throughout come from prototyping each one, not from estimating; in three cases so far
@@ -1772,7 +1794,7 @@ overfill across 80 generations while an unclipped one never drifts negative; the
 mutation stream is unchanged; four new goldens, including clipping at the default
 margin as its own look and the busiest clipped path.
 
-**Phase 18 — Sudoku grid lines.** *(proposed; difficulty: LOW-MEDIUM)*
+**Phase 18 — Sudoku grid lines.** *(done)*
 Draw a 9x9 grid inside the feature box, behind the tiles, suggestive of a sudoku
 grid — the covers have an intended use, and this is the one feature so far with a
 motivation outside the design itself.
@@ -1803,7 +1825,29 @@ or it pokes out through a phase 15 rounded corner. And it is **invisible under t
 phase 17 `solid` look**, where tiles cover the whole box — harmless, but it should
 be documented so it is not reported as broken.
 
-*Open — settle before code:*
+*All four settled before code, as decisions 27-29.* The lines take the background
+with a lightness-aware step away from it where the box already is the background;
+the grid fills the box; it is fixed at 9x9 with weights as constants; and it is
+neither bred nor hidden from the window.
+
+*The correction measurement forced,* recorded because the first answer was wrong in
+a way that only showed on a fraction of covers: the fallback was going to darken the
+background slightly, which is **invisible on dark grounds** — 0.81 dE on the darkest
+Wada `shapes` background, against a just-noticeable difference of about 2.3. Stepping
+toward black *or white* by the background's own lightness gives a minimum of 5.3 dE
+across every ground either mode offers. Decision 8's dark backgrounds are precisely
+the case the simpler rule failed.
+
+*Check (passed):* off by default and byte-identical on all 34 pre-existing goldens;
+the grid never draws outside the box, asserted against the mask, on a square box and
+a rounded one; every pixel that was tile-coloured without the grid is still
+tile-coloured with it, so the lines are provably behind the tiles; both branches of
+the colour rule asserted; **the step is above the just-noticeable difference on every
+ground either colour model offers**, which is decision 27's measurement kept as a
+test rather than a note; weights scale with output size; three new goldens, one per
+branch of the colour rule plus a rounded box.
+
+*The questions this replaced, kept for the record:*
 
 10. **What colour are the lines?** Recommended: the background, with a **darkened
     background as the fallback** when the box and the background match. Two
@@ -1868,15 +1912,13 @@ box and background match, in both colour models; weights scale with output size.
 
 Section 12.2's first three phases are built and their nine questions are settled, as
 decisions 17-26. The list is kept struck through rather than deleted, so that what
-was asked and what was answered stay visible together. **Phase 18's four questions
-are live:**
+was asked and what was answered stay visible together.
 
-- **Sudoku grid lines (phase 18)** — what colour the lines are and what happens when
-  the box is already the background colour (measured: 33% of classic and 20% of Wada
-  covers), whether the cells are square or fill the box, whether the grid is always
-  9x9, and the two line weights. Four questions, and the first is load-bearing: the
-  idea that makes the feature worth doing is also the one that fails on a third of
-  covers.
+- ~~**Sudoku grid lines (phase 18)**~~ — **all four settled**, as decisions 27-29.
+  The first was indeed load-bearing, and its answer changed under measurement twice:
+  once when the background-colour idea was found to show nothing on a third of
+  covers, and again when the fallback for that turned out to be invisible on dark
+  grounds. Phase 18 is built.
 
 
 - ~~**Rounded corners (phase 15)**~~ — **both settled**, as decisions 17 and 18: a

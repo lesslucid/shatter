@@ -672,3 +672,11 @@ def test_clipping_is_not_a_bred_gene():
     for base in (CoverSpec(), CoverSpec(clip_tiles=True)):
         for child in generation(base, 200, FURTHER, random.Random(2)):
             assert child.clip_tiles == base.clip_tiles
+
+
+def test_the_grid_is_not_a_bred_gene():
+    """Decision 29, and the reason the chooser needs a checkbox for it."""
+    assert not any("grid_lines" in gene.fields for gene in GENES)
+    for base in (CoverSpec(), CoverSpec(grid_lines=True)):
+        for child in generation(base, 200, FURTHER, random.Random(2)):
+            assert child.grid_lines == base.grid_lines

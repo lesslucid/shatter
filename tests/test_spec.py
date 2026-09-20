@@ -95,3 +95,13 @@ def test_a_config_written_before_phase_17_still_loads():
 def test_a_solid_cover_round_trips():
     spec = CoverSpec(clip_tiles=True, box_margin=-0.12, box_corner=0.2)
     assert CoverSpec.from_dict(json.loads(json.dumps(spec.to_dict()))) == spec
+
+
+def test_a_config_written_before_phase_18_still_loads():
+    spec = CoverSpec.from_dict({"family": "p3", "zoom": 150, "clip_tiles": True})
+    assert spec.grid_lines is False
+
+
+def test_a_gridded_cover_round_trips():
+    spec = CoverSpec(grid_lines=True, box_corner=0.2)
+    assert CoverSpec.from_dict(json.loads(json.dumps(spec.to_dict()))) == spec

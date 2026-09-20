@@ -375,3 +375,14 @@ def test_generate_accepts_the_solid_look(tmp_path):
 
     spec = CoverSpec.load(config)
     assert spec.clip_tiles is True and spec.box_margin == -0.1
+
+
+def test_generate_accepts_the_grid(tmp_path):
+    config = tmp_path / "grid.json"
+    main([
+        "generate", "--zoom", "60", "--grid-lines", "--only", "front",
+        "--out", str(tmp_path), "--emit-config", str(config),
+    ])
+    from shatter.spec import CoverSpec
+
+    assert CoverSpec.load(config).grid_lines is True

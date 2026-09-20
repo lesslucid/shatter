@@ -114,6 +114,7 @@ class Chooser:
             master=root, value=corner_preset_name(base.box_corner)
         )
         self.fit_var = tk.StringVar(master=root, value=tile_fit_name(base))
+        self.grid_var = tk.BooleanVar(master=root, value=base.grid_lines)
         # The dial browses independently of the selection (decision 23): clicking
         # one of the covers it put on screen must not lose your place in the
         # sweep, so the cover it is walking from is remembered separately.
@@ -202,6 +203,10 @@ class Chooser:
                 command=self.switch_fit,
             ).pack(side="left")
 
+        tk.Checkbutton(
+            fits, text="grid", variable=self.grid_var, command=self.switch_grid
+        ).pack(side="left", padx=(12, 0))
+
         colours = tk.Frame(self.root)
         colours.pack(pady=(4, 0))
         tk.Label(colours, text="colours:", fg="#666").pack(side="left", padx=(0, 4))
@@ -274,6 +279,7 @@ class Chooser:
         self.mode_var.set(spec.mode)
         self.corner_var.set(corner_preset_name(spec.box_corner))
         self.fit_var.set(tile_fit_name(spec))
+        self.grid_var.set(spec.grid_lines)
         if row == 0:
             # Choosing a different cover to work from re-anchors the dial;
             # clicking one of its own results does not (decision 23).
@@ -371,6 +377,29 @@ class Chooser:
         row, column = self.selected
         self.rows[row][column] = changed
         self.refresh(f"tiles: {wanted} (box margin {changed.box_margin:+.2f}).")
+
+    def switch_grid(self) -> None:
+        """Turn the sudoku grid on or off for the selected cover.
+
+        Not a bred gene (decision 29), so this is the only way to reach it once
+        the window is open -- the same reason the corner and tile controls exist.
+        """
+        spec = self.selected_spec()
+        wanted = self.grid_var.get()
+        if spec is None:
+            self.grid_var.set(False)
+            self.say("Pick a cover first, then turn the grid on.")
+            return
+        if spec.grid_lines == wanted:
+            return
+
+        row, column = self.selected
+        self.rows[row][column] = spec.with_changes(grid_lines=wanted)
+        note = "" if not wanted else (
+            " It is invisible under solid tiles."
+            if spec.clip_tiles and spec.box_margin < 0 else ""
+        )
+        self.refresh(f"grid: {'on' if wanted else 'off'}.{note}")
 
     def dial_step(self, step: int) -> None:
         """Fill the variations row with the next or previous page of colours.

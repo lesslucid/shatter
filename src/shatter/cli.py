@@ -199,6 +199,10 @@ def add_presentation_arguments(parser: argparse.ArgumentParser) -> None:
              "it, which with --clip-tiles gives the solid look",
     )
     parser.add_argument(
+        "--grid-lines", dest="grid_lines", action="store_true", default=SUPPRESS,
+        help="draw a 9x9 sudoku grid inside the feature box, behind the tiles",
+    )
+    parser.add_argument(
         "--clip-tiles", dest="clip_tiles", action="store_true", default=SUPPRESS,
         help="cut the tiles off at the box edge instead of letting them spill "
              "onto the background",

@@ -16,6 +16,8 @@ from shatter.render import (
     box_rect,
     canvas_size,
     draw_box,
+    draw_grid,
+    grid_color,
     coverage_map,
     draw_tile_labels,
     draw_tiles,
@@ -644,3 +646,118 @@ def test_clipping_reaches_the_renderer_from_the_spec():
 
     assert CoverSpec(clip_tiles=True).render_params(10, 20).clip_tiles is True
     assert CoverSpec().render_params(10, 20).clip_tiles is False
+
+
+# --- Phase 18: sudoku grid lines ---------------------------------------------
+
+@pytest.mark.parametrize("corner", [0.0, 0.3])
+def test_the_grid_never_draws_outside_the_box(corner):
+    """A full-width line would otherwise poke out through a rounded corner."""
+    from shatter.spec import CoverSpec
+
+    spec = CoverSpec(zoom=60, dropout=1.0, grid_lines=True, box_corner=corner)
+    params = spec.render_params(200, 300, supersample=1)
+    image = render_front(spec.build_layout(), params)
+    mask = box_mask(params, image.size)
+    background = resolve_palette(params).background
+
+    outside = {
+        pixel for pixel, inside in zip(rgb_pixels(image), mask_pixels(mask))
+        if not inside
+    }
+    assert outside == {background}
+
+
+def test_the_grid_sits_behind_the_tiles():
+    """It must never compete with the medallion: wherever a tile covers a grid
+    line, the tile wins."""
+    from shatter.spec import CoverSpec
+
+    kwargs = dict(zoom=60, seed=5, dropout=0.0, max_push=0.0)
+    plain = CoverSpec(**kwargs)
+    gridded = CoverSpec(**kwargs, grid_lines=True)
+    params_a = plain.render_params(200, 300, supersample=1)
+    params_b = gridded.render_params(200, 300, supersample=1)
+
+    a = rgb_pixels(render_front(plain.build_layout(), params_a))
+    b = rgb_pixels(render_front(gridded.build_layout(), params_b))
+    tile = resolve_palette(params_a).tile_a
+
+    # every pixel that was tile-coloured without the grid is still tile-coloured
+    assert [p for p in a if p == tile], "no tiles drawn; this proved nothing"
+    for before, after in zip(a, b):
+        if before == tile:
+            assert after == tile
+
+
+def test_the_grid_takes_the_background_where_the_box_differs():
+    """The whole idea: the box reads as cut into strips with the ground showing
+    through, the same logic the tile gaps use."""
+    palette = resolve_palette(RenderParams(width=10, height=10))
+    assert palette.box != palette.background
+    assert grid_color(palette) == palette.background
+
+
+def test_the_grid_steps_away_where_the_box_is_the_background():
+    """`box_color="bg"` leaves nothing beneath the box to show through."""
+    palette = resolve_palette(RenderParams(width=10, height=10, box_color="bg"))
+    assert palette.box == palette.background
+    assert grid_color(palette) != palette.background
+
+
+def test_the_grid_is_visible_against_every_ground_either_mode_offers():
+    """Decision 27's measurement, pinned. An earlier rule simply darkened the
+    background, which is invisible on a dark ground -- 0.81 dE on the darkest
+    Wada `shapes` background, against a just-noticeable difference of ~2.3."""
+    from shatter.color import (
+        BLACK, Palette, assign_roles, delta_e, offered, parse_hex,
+    )
+    from shatter.breed import BACKGROUNDS
+    from shatter import wada
+
+    grounds = {
+        assign_roles(wada.combination_by_id(cid), "shapes", perm)["background"]
+        for cid, perm in offered("shapes")
+    }
+    grounds |= {parse_hex(hexv) for hexv in BACKGROUNDS}
+
+    worst = min(
+        delta_e(ground, grid_color(
+            Palette(background=ground, box=ground, tile_a=BLACK, tile_b=BLACK,
+                    border=None, overlap=None)
+        ))
+        for ground in grounds
+    )
+    assert worst > 2.3, f"the grid is invisible on some ground ({worst:.2f} dE)"
+    assert worst > 4.0, f"barely above the JND at {worst:.2f} dE"
+
+
+def test_the_grid_weights_scale_with_the_output_size():
+    """Decision 17's reason again: a thumbnail and a print must describe the
+    same grid."""
+    from shatter.render import GRID_HEAVY
+
+    small = RenderParams(width=150, height=225, grid_lines=True)
+    large = RenderParams(width=600, height=900, grid_lines=True)
+
+    def heavy_px(params):
+        x0, y0, x1, y1 = box_rect(params)
+        return GRID_HEAVY * min(x1 - x0, y1 - y0)
+
+    assert heavy_px(large) == pytest.approx(4 * heavy_px(small))
+
+
+def test_the_heavy_lines_fall_where_a_sudoku_box_divides():
+    """Heavier on the 3rd and 6th is what makes it read as sudoku rather than
+    graph paper."""
+    from shatter.render import GRID_DIVISIONS, GRID_HEAVY_EVERY
+
+    heavy = [i for i in range(1, GRID_DIVISIONS) if i % GRID_HEAVY_EVERY == 0]
+    assert heavy == [3, 6]
+
+
+def test_the_grid_reaches_the_renderer_from_the_spec():
+    from shatter.spec import CoverSpec
+
+    assert CoverSpec(grid_lines=True).render_params(10, 20).grid_lines is True
+    assert CoverSpec().render_params(10, 20).grid_lines is False

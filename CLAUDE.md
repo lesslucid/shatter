@@ -38,21 +38,21 @@ so re-deriving them from scratch will waste your time.
 
 ## Status
 
-**Phases 0–17 are all built and nothing is half-done.** 414 tests pass, with a
-34-image golden suite, and the last commit is a clean working state.
+**Phases 0–18 are all built and nothing is half-done.** 435 tests pass, with a
+37-image golden suite, and the last commit is a clean working state.
 
-**Phase 18 (sudoku grid lines) is proposed and not started** — a 9x9 grid drawn
-inside the feature box, behind the tiles, in the background colour so the ground
-shows through. Written up in §12.2 with four open design questions, prototyped
-rather than estimated. The first question is load-bearing: the background-colour
-idea that makes the feature worth doing is measured to show *nothing at all* on
-33% of classic and 20% of Wada covers, because the box is already the background
-in those. Settle that with the user before writing code.
+There is no next phase. §12.2's four later features — rounded corners, the colour
+dial, the solid box and the sudoku grid — are all built, and their thirteen design
+questions are settled as §12.1 decisions 17–29. What remains is in **§13 (open
+items)** and **§14 (not building now)**, plus the short list below — none of it
+committed work.
 
-Everything else in §12.2 is done (rounded corners, the colour dial, the solid box),
-its nine questions settled as §12.1 decisions 17–26. What else remains is in
-**§13 (open items)** and **§14 (not building now)**, plus the short list below —
-none of it committed work.
+The grid (`--grid-lines`) is worth knowing about because its colour rule has two
+branches: normally the lines take the **background** colour so the box reads as cut
+into strips, but where the box already *is* the background — `box_color="bg"`, or
+the Wada `shapes` layout, about a third of covers — they step away from it instead,
+toward black or white by lightness. §12.1 decision 27 records why the obvious
+simpler rules both failed.
 
 ## Working agreement with this user
 
@@ -85,7 +85,7 @@ pick.
 ## Getting oriented
 
 ```bash
-.venv/bin/python -m pytest -q                        # 414 tests, ~25s
+.venv/bin/python -m pytest -q                        # 435 tests, ~18s
 .venv/bin/shatter --help                             # or python -m shatter.cli
 
 # see something, in each colour model
@@ -137,7 +137,7 @@ All new code is in `src/shatter/`. Nothing here is large; `color.py` and
 1. **Never edit anything under `src/covers/tiling/`.** Vendored verbatim from a
    sibling project and treated as read-only (design doc §2). Add behaviour around
    it, in `src/shatter/`.
-2. **`tests/golden/` is a guard, not a convenience.** 34 reference PNGs, compared
+2. **`tests/golden/` is a guard, not a convenience.** 37 reference PNGs, compared
    pixel-for-pixel. `python tests/make_golden.py` regenerates them — run it only
    when you have *decided* the output should change. Regenerating to turn a red
    test green destroys the guard while leaving the test in place, which is worse

@@ -18,9 +18,13 @@ from PIL import Image, ImageChops, ImageDraw, ImageFont
 
 from covers.tiling.base import Polygon
 from shatter.color import (
+    BLACK,
     DEFAULT_WADA_COMBINATION,
     RGB,
+    WHITE,
     Palette,
+    blend,
+    lightness,
     resolve_palette,
 )
 from shatter.geometry import (
@@ -56,6 +60,7 @@ class RenderParams:
     border_width: float = 0.12  # fraction of the median tile radius, NOT pixels
     box_corner: float = 0.0  # corner radius as a fraction of the box's shorter side
     clip_tiles: bool = False  # cut the tiles off at the box edge (phase 17)
+    grid_lines: bool = False  # a sudoku grid behind the tiles (phase 18)
     tile_split: str = "single"  # "single" | "by_type" (colour by prototile shape)
     tile_color_b: str = "bg"  # second prototile's fill; only read when by_type
     # Read only when mode="wada" (phase 13). `tile_split` above is a classic-mode
@@ -147,6 +152,70 @@ def box_mask(params: "RenderParams", size: tuple[int, int], scale: int = 1) -> I
     else:
         draw.rounded_rectangle(rect, radius=radius, fill=255)
     return mask
+
+
+#: A sudoku grid, and the two things that make it read as one: nine divisions, and
+#: a heavier line where the 3x3 boxes meet. Constants rather than spec fields --
+#: this is a look, not a parameter (section 12.1, decision 29).
+GRID_DIVISIONS = 9
+GRID_HEAVY_EVERY = 3
+
+#: Line weights, as fractions of the box's shorter side so that a thumbnail and a
+#: print describe the same grid (decision 17, the same reason corners are).
+GRID_THIN = 0.004
+GRID_HEAVY = 0.010
+
+#: How far the lines step away from the background when the box *is* the
+#: background and there is nothing to show through. Toward black or white
+#: according to the background's own lightness: simply darkening was measured
+#: invisible on dark grounds -- 0.81 dE on the darkest, against a just-noticeable
+#: difference of about 2.3 (decision 27).
+GRID_FALLBACK_STEP = 0.12
+
+
+def grid_color(palette: Palette) -> RGB:
+    """What the grid lines are painted in.
+
+    Normally the background, so the box reads as cut into strips with the ground
+    showing through -- the same logic the tile gaps already use. When the box is
+    already the background (`box_color="bg"`, or the Wada `shapes` layout, which
+    together are about a third of covers) there is nothing beneath it, so the
+    lines step away from the background instead of matching it.
+    """
+    if palette.box != palette.background:
+        return palette.background
+    toward = BLACK if lightness(palette.background) > 50 else WHITE
+    return blend(palette.background, toward, GRID_FALLBACK_STEP)
+
+
+def draw_grid(
+    image: Image.Image, params: "RenderParams", palette: Palette, scale: int = 1
+) -> None:
+    """A sudoku grid inside the feature box (phase 18).
+
+    Drawn onto a copy and pasted back through the box mask, because a full-width
+    line would otherwise poke out through a rounded corner (phase 15). Called
+    before the tiles so the grid sits behind them and never competes with the
+    medallion.
+
+    The grid fills the box, so its cells take the box's aspect rather than staying
+    square (decision 28): that keeps it aligned to all four edges, which is what
+    makes it read as part of the box rather than an object placed on it.
+    """
+    x0, y0, x1, y1 = box_rect(params, scale)
+    shorter = min(x1 - x0, y1 - y0)
+    color = grid_color(palette)
+
+    layer = image.copy()
+    draw = ImageDraw.Draw(layer)
+    for index in range(1, GRID_DIVISIONS):
+        heavy = index % GRID_HEAVY_EVERY == 0
+        width = max(1, round((GRID_HEAVY if heavy else GRID_THIN) * shorter))
+        x = x0 + (x1 - x0) * index / GRID_DIVISIONS
+        y = y0 + (y1 - y0) * index / GRID_DIVISIONS
+        draw.rectangle((x - width / 2, y0, x + width / 2, y1), fill=color)
+        draw.rectangle((x0, y - width / 2, x1, y + width / 2), fill=color)
+    image.paste(layer, (0, 0), box_mask(params, image.size, scale))
 
 
 def fit_to_box(
@@ -381,6 +450,9 @@ def render_front(layout: ShatterLayout, params: RenderParams) -> Image.Image:
 
     image = Image.new("RGB", size, palette.background)
     draw_box(image, params, palette.box, scale)
+    if params.grid_lines:
+        # Before the clipping copy below, so a clipped cover inherits the grid.
+        draw_grid(image, params, palette, scale)
 
     placed = placed_shapes(layout, params, scale)
     shapes = [tile.points for tile in placed]
