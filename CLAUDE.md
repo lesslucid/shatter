@@ -148,20 +148,21 @@ All new code is in `src/shatter/`. Nothing here is large; `color.py` and
 4. **New `CoverSpec` fields must be additive with a default.** `from_dict` raises
    on unknown keys, so a config written by an older version must still load.
 
-## Git — read this before committing
+## Git
 
-**The repo root is the parent directory**, `/home/guy/scripts/python`, which also
-holds about ten unrelated projects (`aosiran/`, `todo/`, `turn-snake/` and —
-importantly — `covers/`, the read-only reference of hard rule 1). Only
-`shattered/` is tracked.
+The repo root is the project root — `pyproject.toml`, `src/` and `tests/` sit at
+the top level, and `git add -A` is safe.
 
-**Never `git add -A`.** Scope every add to this subtree:
+**This was not always true.** The project was developed inside a larger repo at
+`/home/guy/scripts/python`, where it lived in a `shattered/` subdirectory
+alongside about ten unrelated projects, and where `git add -A` would have swept
+in all of them. The history here was rewritten with
+`git filter-branch --subdirectory-filter` when the project was published, so
+every commit before that point originally had a `shattered/` prefix. If you are
+comparing against that old repo, that is why the paths differ.
 
-```bash
-cd /home/guy/scripts/python && git add shattered/
-```
-
-There is no remote, and history starts at the initial commit of this project.
+The old copy may still exist on this machine. **This repo is the canonical one**;
+changes made in the old location will not appear here.
 
 ## If you come back: what is deliberately not done
 
